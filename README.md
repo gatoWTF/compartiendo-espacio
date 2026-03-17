@@ -1,36 +1,36 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Parking-s-Together Backend
+# Parking-s-Together
 
-## Getting Started
+**Optimización de Movilidad Urbana y Gestión Inteligente de Estacionamientos**
 
-First, run the development server:
+"Compartiendo Espacio" es una plataforma tecnológica diseñada para revolucionar la forma en que los conductores encuentran estacionamiento en áreas metropolitanas. A través de un sistema en tiempo real basado en geolocalización, la aplicación reduce la congestión vehicular, fomenta la inclusión y abre la puerta a un modelo de economía colaborativa (Peer-to-Peer).
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+---
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Caracteristicas Principales
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+* **Semáforo de Ocupación en Tiempo Real:** Interfaz visual intuitiva (Verde, Amarillo, Rojo) impulsada por WebSockets para conocer la disponibilidad al instante de forma segura mientras se conduce.
+* **Enfoque Inclusivo:** Monitoreo y visualización destacada de plazas de garantía exclusivas para personas con movilidad reducida.
+* **Modelo P2P y Tarifas Dinámicas:** Permite a usuarios particulares ofrecer sus propios espacios privados, junto con un sistema de reservas anticipadas.
+* **Preparado para IoT y Smart Cities:** Arquitectura escalable diseñada para integrarse en el futuro con sensores de piso y cámaras de reconocimiento de patentes.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## Stack Tecnológico
 
-To learn more about Next.js, take a look at the following resources:
+El proyecto está construido sobre una arquitectura moderna, escalable y orientada a la nube para garantizar respuestas de baja latencia:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+* **Frontend y API Routes:** Next.js (React)
+* **Base de Datos, Realtime y Auth:** Supabase (PostgreSQL + PostGIS para consultas geoespaciales)
+* **Despliegue y Hosting (Edge):** Vercel
+* **Motor de Predicción (Microservicio):** Python
+* **Control de Versiones y CI/CD:** GitHub
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## Estructura de la Documentación
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Para comprender a fondo la lógica, arquitectura y reglas comerciales de este proyecto, revisa los siguientes documentos adjuntos en la raíz de este repositorio:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. [Contexto Técnico y Arquitectura](docs/context.md): Detalles sobre el flujo de datos, la justificación del stack tecnológico y la estructuración de los módulos.
+2. [Product Requirements Document](docs/prd_business.md): Reglas de negocio, modelo de monetización, alcance del producto final y métricas de éxito (KPIs).
