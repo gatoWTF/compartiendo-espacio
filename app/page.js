@@ -1,65 +1,89 @@
-import Image from "next/image";
+'use client';
+import dynamic from 'next/dynamic';
+
+const MapComponent = dynamic(() => import('../components/Map'), { 
+  ssr: false,
+  loading: () => <div className="map-container glass-panel" style={{ height: '600px', display: 'flex', alignItems: 'center', justifyCenter: 'center' }}>Cargando mapa...</div>
+});
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.js file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <section className="view-content search-layout">
+      <div className="search-main-area">
+        <div className="search-header" style={{ marginBottom: '25px' }}>
+          
+          <div className="search-box-wrapper" style={{ 
+            flex: 1, 
+            display: 'flex', 
+            alignItems: 'center', 
+            padding: '12px 20px',
+            gap: '15px',
+            background: 'rgba(30, 41, 59, 0.5)',
+            backdropFilter: 'blur(20px)',
+            borderRadius: '16px',
+            border: '1px solid rgba(59, 130, 246, 0.3)',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2), inset 0 0 10px rgba(59, 130, 246, 0.1)'
+          }}>
+            <i className="fa-solid fa-magnifying-glass" style={{ color: 'var(--primary)', fontSize: '1.2rem' }}></i>
+            <input 
+              type="text" 
+              id="map-search-input" 
+              placeholder="¿A dónde vas hoy? (Comuna, lugar o anfitrión...)" 
+              style={{ 
+                background: 'transparent', 
+                border: 'none', 
+                color: 'white', 
+                width: '100%', 
+                outline: 'none',
+                fontSize: '1rem',
+                fontWeight: '300'
+              }}
+            />
+          </div>
+          
+          <button id="btn-gps" className="btn-primary" style={{ 
+            width: 'auto', 
+            marginLeft: '15px', 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '10px',
+            padding: '12px 28px',
+            borderRadius: '16px',
+            background: 'linear-gradient(135deg, var(--primary) 0%, #1e40af 100%)',
+            border: 'none',
+            boxShadow: '0 4px 15px rgba(59, 130, 246, 0.4)',
+            transition: 'transform 0.2s'
+          }}>
+            <i className="fa-solid fa-location-crosshairs"></i> 
+            <span style={{ fontWeight: '600' }}>UBICACIÓN</span>
+          </button>
+        </div>
+
+        <div id="real-map" className="map-container glass-panel" style={{ 
+          height: '600px', 
+          borderRadius: '24px',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          overflow: 'hidden',
+          position: 'relative'
+        }}>
+           <MapComponent />
+        </div>
+      </div>
+
+      <div className="top-rated-panel glass-panel" style={{ borderRadius: '24px' }}>
+        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '15px', marginBottom: '20px' }}>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '1.2rem' }}>
+                <i className="fa-solid fa-square-p" style={{ color: 'var(--primary)', fontSize: '1.5rem' }}></i>
+                Disponibilidad Real
+            </h3>
+        </div>
+        <div id="arrendadores-list" className="arrendadores-list">
+          <p style={{ color: 'var(--text-muted)', textAlign: 'center', marginTop: '30px' }}>
+            <i className="fa-solid fa-circle-notch fa-spin" style={{ marginRight: '10px' }}></i> 
+            Sincronizando con la red...
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+      </div>
+    </section>
   );
 }
