@@ -1,4 +1,5 @@
 import "./globals.css";
+import Link from 'next/link'; 
 
 export const metadata = {
   title: "Compartiendo Espacio",
@@ -10,7 +11,6 @@ export default function RootLayout({ children }) {
     <html lang="es">
       <head>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
       </head>
       <body>
         <div className="app-container">
@@ -21,13 +21,20 @@ export default function RootLayout({ children }) {
             </div>
 
             <nav className="nav-menu">
-              <button className="nav-btn active"><i className="fa-solid fa-map-location-dot"></i> Búsqueda y Mapa</button>
-              <button className="nav-btn"><i className="fa-solid fa-envelope"></i> Soporte y Contacto</button>
+              <Link href="/" style={{ textDecoration: 'none' }}>
+                <button className="nav-btn"><i className="fa-solid fa-map-location-dot"></i> Búsqueda y Mapa</button>
+              </Link>
+              {/* INNOVACIÓN: Nuevo enlace al Panel Administrativo */}
+              <Link href="/dashboard" style={{ textDecoration: 'none' }}>
+                <button className="nav-btn"><i className="fa-solid fa-chart-line"></i> Mi Panel de Anfitrión</button>
+              </Link>
             </nav>
 
             <div className="user-menu">
               <div id="auth-menu">
-                <button className="btn-outline"><i className="fa-solid fa-user"></i> Ingresar / Registro</button>
+                <Link href="/auth" style={{ textDecoration: 'none' }}>
+                  <button className="btn-outline"><i className="fa-solid fa-user"></i> Ingresar / Registro</button>
+                </Link>
               </div>
             </div>
             
