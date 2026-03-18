@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { supabase } from '../../lib/supabase'; 
+import { supabase } from '../../lib/supabase';
 import { useRouter } from 'next/navigation';
 
 export default function AuthPage() {
@@ -15,6 +15,7 @@ export default function AuthPage() {
   const [rut, setRut] = useState('');
   const [rol, setRol] = useState('cliente');
   const [patente, setPatente] = useState('');
+  const [telefono, setTelefono] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -27,7 +28,8 @@ export default function AuthPage() {
         setMessage({ type: 'error', text: 'Credenciales incorrectas. Verifica tu correo y contraseña.' });
         setLoading(false);
       } else {
-        router.push(rol === 'arrendador' ? '/dashboard' : '/'); 
+        const { data: { user } } = await supabase.auth.getUser();
+        router.push(user.user_metadata?.rol === 'arrendador' ? '/dashboard' : '/'); 
       }
     } else {
       const rutLimpio = rut.replace(/\./g, ''); 
@@ -39,7 +41,8 @@ export default function AuthPage() {
             nombre_completo: nombre,
             rut: rutLimpio,
             rol: rol,
-            patente: patente || "No registrada"
+            patente: patente || "No registrada",
+            telefono: telefono
           }
         }
       });
@@ -57,7 +60,7 @@ export default function AuthPage() {
              router.push(rol === 'arrendador' ? '/dashboard' : '/');
            } else {
              setIsLogin(true);
-             setMessage({ type: 'success', text: 'Cuenta creada. Por favor, inicia sesión.' });
+             setMessage({ type: 'success', text: 'Cuenta creada. Inicia sesión.' });
              setLoading(false);
            }
         }
@@ -66,125 +69,232 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="auth-split-layout">
-      {/* ESTILOS ESPECÍFICOS PARA ESTA VISTA */}
+    <section className="auth-wrapper">
+      {/* ESTILOS DE MEZCLA PERFECTA Y GLASSMORPHISM */}
       <style dangerouslySetInnerHTML={{__html: `
-        .auth-split-layout { display: flex; height: 100vh; width: 100%; background: #ffffff; overflow: hidden; }
-        .auth-left { flex: 1; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 40px; color: white; text-align: center; }
-        .auth-right { flex: 1; display: flex; justify-content: center; align-items: center; padding: 20px; background: #ffffff; }
-        .auth-form-container { width: 100%; max-width: 400px; }
-        .modern-input-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
-        .modern-input-group label { font-size: 0.9rem; font-weight: 600; color: #475569; }
-        .modern-input-group input { padding: 12px 16px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f8fafc; color: #0f172a; font-size: 1rem; outline: none; transition: 0.2s; }
-        .modern-input-group input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); background: #ffffff; }
-        .social-btn { flex: 1; display: flex; justify-content: center; align-items: center; gap: 10px; padding: 10px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: #0f172a; font-weight: 600; cursor: pointer; transition: 0.2s; }
-        .social-btn:hover { background: #f8fafc; }
-        @media (max-width: 768px) { .auth-left { display: none; } }
+        .auth-wrapper {
+          min-height: 100vh;
+          width: 100%;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          padding: 20px;
+          /* Fondo oscuro elegante con un ligero degradado índigo/azulado */
+          background: radial-gradient(circle at top right, #1e1b4b 0%, #0f172a 40%, #020617 100%);
+        }
+
+        .auth-glass-panel {
+          width: 100%;
+          max-width: 460px;
+          padding: 45px 40px;
+          border-radius: 24px;
+          /* Efecto cristal esmerilado premium */
+          background: rgba(30, 41, 59, 0.4);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(99, 102, 241, 0.1) inset;
+        }
+
+        .auth-header-icon {
+          font-size: 3.5rem;
+          background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          margin-bottom: 15px;
+          filter: drop-shadow(0 0 15px rgba(99,102,241,0.4));
+        }
+
+        .auth-tabs {
+          display: flex;
+          background: rgba(0,0,0,0.2);
+          border-radius: 12px;
+          padding: 5px;
+          margin-bottom: 30px;
+          border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .auth-tab-btn {
+          flex: 1;
+          padding: 12px;
+          border-radius: 8px;
+          border: none;
+          background: transparent;
+          color: #94a3b8;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s ease;
+        }
+
+        .auth-tab-btn.active {
+          background: rgba(99, 102, 241, 0.15);
+          color: #c7d2fe;
+          box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+          border: 1px solid rgba(99, 102, 241, 0.3);
+        }
+
+        .modern-input-group {
+          position: relative;
+          margin-bottom: 18px;
+        }
+
+        .modern-input-group i {
+          position: absolute;
+          left: 16px;
+          top: 50%;
+          transform: translateY(-50%);
+          color: #64748b;
+          font-size: 1.1rem;
+          transition: 0.3s;
+        }
+
+        .modern-input-group input {
+          width: 100%;
+          padding: 15px 15px 15px 45px;
+          background: rgba(15, 23, 42, 0.6);
+          border: 1px solid rgba(255,255,255,0.08);
+          border-radius: 12px;
+          color: #f8fafc;
+          font-size: 1rem;
+          outline: none;
+          transition: all 0.3s ease;
+        }
+
+        .modern-input-group input:focus {
+          border-color: #6366f1;
+          background: rgba(15, 23, 42, 0.8);
+          box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
+        }
+
+        .modern-input-group input:focus + i,
+        .modern-input-group input:not(:placeholder-shown) ~ i {
+          color: #818cf8;
+        }
+
+        .role-selector {
+          display: flex;
+          justify-content: space-around;
+          background: rgba(15, 23, 42, 0.6);
+          padding: 15px;
+          border-radius: 12px;
+          border: 1px solid rgba(255,255,255,0.08);
+          margin-bottom: 20px;
+        }
+
+        .btn-gradient {
+          width: 100%;
+          padding: 15px;
+          border-radius: 12px;
+          border: none;
+          background: linear-gradient(135deg, #4f46e5 0%, #7e22ce 100%);
+          color: white;
+          font-size: 1.1rem;
+          font-weight: bold;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          margin-top: 10px;
+          box-shadow: 0 10px 20px -10px rgba(99, 102, 241, 0.6);
+        }
+
+        .btn-gradient:hover:not(:disabled) {
+          transform: translateY(-2px);
+          box-shadow: 0 15px 25px -10px rgba(99, 102, 241, 0.8);
+        }
+        
+        .btn-gradient:disabled {
+          opacity: 0.7;
+          cursor: not-allowed;
+        }
       `}} />
 
-      {/* PANEL IZQUIERDO (Branding) */}
-      <div className="auth-left">
-        <i className="fa-solid fa-map-location-dot" style={{ fontSize: '120px', color: '#3b82f6', marginBottom: '30px', filter: 'drop-shadow(0 0 20px rgba(59,130,246,0.5))' }}></i>
-        <h1 style={{ fontSize: '2.5rem', fontWeight: '800', marginBottom: '10px' }}>Compartiendo Espacio</h1>
-        <p style={{ fontSize: '1.1rem', color: '#94a3b8', maxWidth: '80%' }}>Optimización de Movilidad Urbana. Encuentra el estacionamiento perfecto o genera ingresos con tu espacio.</p>
-      </div>
-
-      {/* PANEL DERECHO (Formulario Claro) */}
-      <div className="auth-right">
-        <div className="auth-form-container">
-          
-          <h2 style={{ color: '#0f172a', fontSize: '1.8rem', fontWeight: 'bold', marginBottom: '5px' }}>
-            {isLogin ? 'Bienvenido de vuelta' : 'Crea tu cuenta'}
+      <div className="auth-glass-panel">
+        
+        <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+          <i className="fa-solid fa-map-location-dot auth-header-icon"></i>
+          <h2 style={{ color: '#f8fafc', fontSize: '2.2rem', fontWeight: '800', margin: '0 0 5px 0', letterSpacing: '-0.5px' }}>
+            {isLogin ? 'Bienvenido' : 'Únete a la Red'}
           </h2>
-          <p style={{ color: '#64748b', marginBottom: '25px', fontSize: '0.95rem' }}>
-            {isLogin ? 'Ingresa tus datos para acceder.' : 'Únete a la red de movilidad más grande.'}
+          <p style={{ color: '#94a3b8', fontSize: '1rem', margin: 0 }}>
+            {isLogin ? 'Ingresa para gestionar tu movilidad.' : 'Tu espacio, tus reglas, tu ciudad.'}
           </p>
+        </div>
+        
+        <div className="auth-tabs">
+          <button className={`auth-tab-btn ${isLogin ? 'active' : ''}`} onClick={() => { setIsLogin(true); setMessage(null); }}>
+            Iniciar Sesión
+          </button>
+          <button className={`auth-tab-btn ${!isLogin ? 'active' : ''}`} onClick={() => { setIsLogin(false); setMessage(null); }}>
+            Crear Cuenta
+          </button>
+        </div>
+        
+        <form onSubmit={handleSubmit}>
+          
+          {!isLogin && (
+            <div style={{ animation: 'fadeIn 0.3s ease' }}>
+              <div className="role-selector">
+                <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: '#e2e8f0', fontWeight: '600' }}>
+                  <input type="radio" name="rol" value="cliente" checked={rol === 'cliente'} onChange={(e) => setRol(e.target.value)} style={{ accentColor: '#818cf8', width: '18px', height: '18px' }} /> 
+                  <i className="fa-solid fa-car" style={{color: '#94a3b8'}}></i> Conductor
+                </label>
+                <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: '#e2e8f0', fontWeight: '600' }}>
+                  <input type="radio" name="rol" value="arrendador" checked={rol === 'arrendador'} onChange={(e) => setRol(e.target.value)} style={{ accentColor: '#818cf8', width: '18px', height: '18px' }} /> 
+                  <i className="fa-solid fa-parking" style={{color: '#94a3b8'}}></i> Anfitrión
+                </label>
+              </div>
 
-          <div style={{ display: 'flex', borderBottom: '2px solid #e2e8f0', marginBottom: '25px' }}>
-            <button onClick={() => { setIsLogin(true); setMessage(null); }} style={{ flex: 1, padding: '10px', background: 'none', border: 'none', color: isLogin ? '#3b82f6' : '#94a3b8', borderBottom: isLogin ? '2px solid #3b82f6' : 'none', cursor: 'pointer', fontWeight: 'bold', marginBottom: '-2px', transition: '0.2s' }}>
-              Iniciar Sesión
-            </button>
-            <button onClick={() => { setIsLogin(false); setMessage(null); }} style={{ flex: 1, padding: '10px', background: 'none', border: 'none', color: !isLogin ? '#3b82f6' : '#94a3b8', borderBottom: !isLogin ? '2px solid #3b82f6' : 'none', cursor: 'pointer', fontWeight: 'bold', marginBottom: '-2px', transition: '0.2s' }}>
-              Registrarse
-            </button>
+              <div className="modern-input-group">
+                <input type="text" placeholder="Nombre Completo" value={nombre} onChange={e => setNombre(e.target.value)} required />
+                <i className="fa-solid fa-user"></i>
+              </div>
+              <div className="modern-input-group">
+                <input type="text" placeholder="RUT (ej: 12345678-9)" value={rut} onChange={e => setRut(e.target.value)} required />
+                <i className="fa-solid fa-id-card"></i>
+              </div>
+              <div className="modern-input-group">
+                <input type="tel" placeholder="Teléfono (ej: +56912345678)" value={telefono} onChange={e => setTelefono(e.target.value)} required />
+                <i className="fa-solid fa-phone"></i>
+              </div>
+              
+              {rol === 'cliente' && (
+                <div className="modern-input-group">
+                  <input type="text" placeholder="Patente (Opcional)" value={patente} onChange={e => setPatente(e.target.value)} />
+                  <i className="fa-solid fa-car-side"></i>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="modern-input-group">
+            <input type="email" placeholder="Correo Electrónico" value={email} onChange={e => setEmail(e.target.value)} required />
+            <i className="fa-solid fa-envelope"></i>
           </div>
           
-          <form onSubmit={handleSubmit}>
-            
-            {!isLogin && (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'space-around', background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', marginBottom: '16px' }}>
-                  <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: '#0f172a', fontWeight: '600' }}>
-                    <input type="radio" name="rol" value="cliente" checked={rol === 'cliente'} onChange={(e) => setRol(e.target.value)} style={{ accentColor: '#3b82f6' }} /> Conductor
-                  </label>
-                  <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: '#0f172a', fontWeight: '600' }}>
-                    <input type="radio" name="rol" value="arrendador" checked={rol === 'arrendador'} onChange={(e) => setRol(e.target.value)} style={{ accentColor: '#3b82f6' }} /> Anfitrión
-                  </label>
-                </div>
-                <div className="modern-input-group">
-                  <label>Nombre Completo</label>
-                  <input type="text" placeholder="Ej: Juan Pérez" value={nombre} onChange={e => setNombre(e.target.value)} required />
-                </div>
-                <div className="modern-input-group">
-                  <label>RUT</label>
-                  <input type="text" placeholder="Ej: 12345678-9" value={rut} onChange={e => setRut(e.target.value)} required />
-                </div>
-                {rol === 'cliente' && (
-                  <div className="modern-input-group">
-                    <label>Patente (Opcional)</label>
-                    <input type="text" placeholder="Ej: AB1234" value={patente} onChange={e => setPatente(e.target.value)} />
-                  </div>
-                )}
-              </>
-            )}
-
-            <div className="modern-input-group">
-              <label>Correo Electrónico</label>
-              <input type="email" placeholder="ejemplo@correo.com" value={email} onChange={e => setEmail(e.target.value)} required />
-            </div>
-            
-            <div className="modern-input-group" style={{ marginBottom: '8px' }}>
-              <label>Contraseña</label>
-              <input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required minLength="6" />
-            </div>
-
-            {isLogin && (
-              <div style={{ textAlign: 'right', marginBottom: '20px' }}>
-                <a href="#" style={{ color: '#3b82f6', fontSize: '0.85rem', textDecoration: 'none', fontWeight: '600' }}>¿Olvidé mi contraseña?</a>
-              </div>
-            )}
-            
-            {message && (
-              <div style={{ background: message.type === 'error' ? '#fee2e2' : '#d1fae5', borderLeft: `4px solid ${message.type === 'error' ? '#ef4444' : '#10b981'}`, padding: '12px', borderRadius: '4px', marginBottom: '20px' }}>
-                <p style={{ color: message.type === 'error' ? '#b91c1c' : '#047857', fontSize: '0.85rem', margin: 0, fontWeight: '600' }}>
-                  {message.text}
-                </p>
-              </div>
-            )}
-
-            <button type="submit" style={{ background: '#3b82f6', color: 'white', padding: '14px', borderRadius: '8px', border: 'none', width: '100%', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer', transition: '0.2s', marginTop: isLogin ? '0' : '15px' }} disabled={loading}>
-              {loading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : (isLogin ? 'Ingresar' : 'Registrarme')}
-            </button>
-          </form>
-
-          {/* SEPARADOR Y BOTONES SOCIALES (Estéticos para igualar la foto) */}
-          <div style={{ display: 'flex', alignItems: 'center', margin: '25px 0' }}>
-            <div style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }}></div>
-            <span style={{ padding: '0 15px', color: '#64748b', fontSize: '0.85rem', fontWeight: '500' }}>O ingresa con</span>
-            <div style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }}></div>
+          <div className="modern-input-group" style={{ marginBottom: '10px' }}>
+            <input type="password" placeholder="Contraseña (mín. 6 caracteres)" value={password} onChange={e => setPassword(e.target.value)} required minLength="6" />
+            <i className="fa-solid fa-lock"></i>
           </div>
 
-          <div style={{ display: 'flex', gap: '15px' }}>
-            <button className="social-btn" type="button">
-              <i className="fa-brands fa-google" style={{ color: '#ea4335', fontSize: '1.2rem' }}></i> Google
-            </button>
-            <button className="social-btn" type="button">
-              <i className="fa-brands fa-apple" style={{ fontSize: '1.3rem' }}></i> Apple
-            </button>
-          </div>
+          {isLogin && (
+            <div style={{ textAlign: 'right', marginBottom: '20px' }}>
+              <a href="#" style={{ color: '#818cf8', fontSize: '0.85rem', textDecoration: 'none', fontWeight: '600', transition: '0.2s' }}>¿Olvidaste tu contraseña?</a>
+            </div>
+          )}
+          
+          {message && (
+            <div style={{ background: message.type === 'error' ? 'rgba(220, 38, 38, 0.15)' : 'rgba(5, 150, 105, 0.15)', borderLeft: `4px solid ${message.type === 'error' ? '#ef4444' : '#10b981'}`, padding: '12px 16px', borderRadius: '8px', marginBottom: '20px' }}>
+              <p style={{ color: message.type === 'error' ? '#fca5a5' : '#a7f3d0', fontSize: '0.9rem', margin: 0, fontWeight: '500' }}>
+                <i className={`fa-solid ${message.type === 'error' ? 'fa-triangle-exclamation' : 'fa-circle-check'}`} style={{ marginRight: '8px' }}></i>
+                {message.text}
+              </p>
+            </div>
+          )}
 
-        </div>
+          <button type="submit" className="btn-gradient" disabled={loading}>
+            {loading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : (isLogin ? 'Ingresar a mi panel' : 'Comenzar ahora')}
+          </button>
+        </form>
       </div>
-    </div>
+    </section>
   );
 }
