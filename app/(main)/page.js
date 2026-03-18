@@ -1,10 +1,9 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase'; // <-- Ruta de un solo nivel (correcta)
+import { supabase } from '../../lib/supabase'; // <-- Ruta de un solo nivel (correcta)
 import dynamic from 'next/dynamic';
 
-const MapComponent = dynamic(() => import('../components/Map'), { // <-- Ruta correcta
-    ssr: false,
+const MapComponent = dynamic(() => import('../../components/Map'), {    ssr: false,
     loading: () => <div className="map-container glass-panel" style={{ height: '600px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Iniciando satélite...</div>
 });
 
