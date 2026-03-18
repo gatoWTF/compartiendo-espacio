@@ -22,16 +22,19 @@ export default function AuthPage() {
     setMessage(null);
 
     if (isLogin) {
+      // PROCESO DE LOGIN NORMAL
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
-        setMessage({ type: 'error', text: 'Credenciales incorrectas o el usuario no existe.' });
+        setMessage({ type: 'error', text: 'Credenciales incorrectas. Verifica tu correo y contraseña.' });
+        setLoading(false);
       } else {
-        router.push('/'); // Redirige al mapa
+        router.push(rol === 'arrendador' ? '/dashboard' : '/'); 
       }
     } else {
+      // PROCESO DE REGISTRO INNOVADO (AUTO-LOGIN)
       const rutLimpio = rut.replace(/\./g, ''); 
       
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -46,12 +49,28 @@ export default function AuthPage() {
 
       if (error) {
         setMessage({ type: 'error', text: error.message });
+        setLoading(false);
       } else {
-        setMessage({ type: 'success', text: '¡Cuenta creada! Ya puedes iniciar sesión.' });
-        setIsLogin(true);
+        setMessage({ type: 'success', text: '¡Cuenta creada! Entrando a la red...' });
+        
+        // INNOVACIÓN: Redirección automática inteligente
+        // Si Supabase devuelve la sesión de inmediato, lo mandamos al panel
+        if (data.session) {
+           router.push(rol === 'arrendador' ? '/dashboard' : '/');
+        } else {
+           // Si no devuelve sesión (por latencia), forzamos el inicio de sesión por detrás
+           const { error: loginErr } = await supabase.auth.signInWithPassword({ email, password });
+           if (!loginErr) {
+             router.push(rol === 'arrendador' ? '/dashboard' : '/');
+           } else {
+             // Fallback: Si algo falla, lo dejamos en la pantalla de login listo para entrar
+             setIsLogin(true);
+             setMessage({ type: 'success', text: 'Cuenta creada. Por favor, inicia sesión.' });
+             setLoading(false);
+           }
+        }
       }
     }
-    setLoading(false);
   };
 
   return (
@@ -62,14 +81,14 @@ export default function AuthPage() {
           <button 
             className={`tab-btn ${isLogin ? 'active' : ''}`} 
             onClick={() => { setIsLogin(true); setMessage(null); }}
-            style={{ flex: 1, padding: '10px', background: 'none', border: 'none', color: isLogin ? 'var(--primary)' : 'var(--text-muted)', borderBottom: isLogin ? '2px solid var(--primary)' : 'none', cursor: 'pointer', fontWeight: isLogin ? 'bold' : 'normal' }}
+            style={{ flex: 1, padding: '10px', background: 'none', border: 'none', color: isLogin ? 'var(--primary)' : 'var(--text-muted)', borderBottom: isLogin ? '2px solid var(--primary)' : 'none', cursor: 'pointer', fontWeight: isLogin ? 'bold' : 'normal', transition: '0.3s' }}
           >
             Iniciar Sesión
           </button>
           <button 
             className={`tab-btn ${!isLogin ? 'active' : ''}`} 
             onClick={() => { setIsLogin(false); setMessage(null); }}
-            style={{ flex: 1, padding: '10px', background: 'none', border: 'none', color: !isLogin ? 'var(--primary)' : 'var(--text-muted)', borderBottom: !isLogin ? '2px solid var(--primary)' : 'none', cursor: 'pointer', fontWeight: !isLogin ? 'bold' : 'normal' }}
+            style={{ flex: 1, padding: '10px', background: 'none', border: 'none', color: !isLogin ? 'var(--primary)' : 'var(--text-muted)', borderBottom: !isLogin ? '2px solid var(--primary)' : 'none', cursor: 'pointer', fontWeight: !isLogin ? 'bold' : 'normal', transition: '0.3s' }}
           >
             Crear Cuenta
           </button>
@@ -83,9 +102,13 @@ export default function AuthPage() {
             </div>
           ) : (
             <>
-              <div className="role-selector" style={{ display: 'flex', justifyContent: 'space-around', background: 'rgba(0,0,0,0.4)', padding: '12px', borderRadius: '8px', fontSize: '0.9rem', border: '1px solid var(--border-glass)' }}>
-                <label style={{ cursor: 'pointer' }}><input type="radio" name="rol" value="cliente" checked={rol === 'cliente'} onChange={(e) => setRol(e.target.value)} style={{ marginRight: '5px' }} /> Conductor</label>
-                <label style={{ cursor: 'pointer' }}><input type="radio" name="rol" value="arrendador" checked={rol === 'arrendador'} onChange={(e) => setRol(e.target.value)} style={{ marginRight: '5px' }}/> Anfitrión</label>
+              <div className="role-selector" style={{ display: 'flex', justifyContent: 'space-around', background: 'rgba(0,0,0,0.4)', padding: '12px', borderRadius: '8px', fontSize: '0.9rem', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <input type="radio" name="rol" value="cliente" checked={rol === 'cliente'} onChange={(e) => setRol(e.target.value)} /> Conductor
+                </label>
+                <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <input type="radio" name="rol" value="arrendador" checked={rol === 'arrendador'} onChange={(e) => setRol(e.target.value)} /> Anfitrión
+                </label>
               </div>
               <div className="input-group"><i className="fa-solid fa-user"></i><input type="text" placeholder="Nombre Completo" value={nombre} onChange={e => setNombre(e.target.value)} required /></div>
               <div className="input-group"><i className="fa-solid fa-id-card"></i><input type="text" placeholder="RUT (ej: 12345678-9)" value={rut} onChange={e => setRut(e.target.value)} required /></div>
@@ -96,15 +119,17 @@ export default function AuthPage() {
           )}
 
           <div className="input-group"><i className="fa-solid fa-envelope"></i><input type="email" placeholder="Correo Electrónico" value={email} onChange={e => setEmail(e.target.value)} required /></div>
-          <div className="input-group"><i className="fa-solid fa-lock"></i><input type="password" placeholder="Contraseña (mínimo 6 caracteres)" value={password} onChange={e => setPassword(e.target.value)} required minLength="6" /></div>
+          <div className="input-group"><i className="fa-solid fa-lock"></i><input type="password" placeholder="Contraseña (mín. 6 caracteres)" value={password} onChange={e => setPassword(e.target.value)} required minLength="6" /></div>
           
           {message && (
-            <p style={{ color: message.type === 'error' ? 'var(--status-red)' : 'var(--status-green)', fontSize: '0.85rem', textAlign: 'center', background: 'rgba(0,0,0,0.4)', padding: '10px', borderRadius: '8px' }}>
-              {message.text}
-            </p>
+            <div style={{ background: message.type === 'error' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)', borderLeft: `3px solid ${message.type === 'error' ? 'var(--status-red)' : 'var(--status-green)'}`, padding: '10px', borderRadius: '4px' }}>
+              <p style={{ color: message.type === 'error' ? 'var(--status-red)' : 'var(--status-green)', fontSize: '0.85rem', textAlign: 'center', margin: 0 }}>
+                {message.text}
+              </p>
+            </div>
           )}
 
-          <button type="submit" className="btn-primary" disabled={loading} style={{ marginTop: '10px' }}>
+          <button type="submit" className="btn-primary" disabled={loading} style={{ marginTop: '10px', height: '45px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             {loading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : (isLogin ? 'Entrar a la red' : 'Completar Registro')}
           </button>
         </form>
