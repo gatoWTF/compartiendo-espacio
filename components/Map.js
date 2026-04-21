@@ -1,96 +1,101 @@
 'use client';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-export default function Map({ parkings, selectedParkingId, userLocation }) {
+export default function MapComponent({ parkings = [], focusedSpot = null, onUserLocate = null }) {
   const mapRef = useRef(null);
-  const markersLayerRef = useRef(null);
-  const markersMapRef = useRef({});
-  const userMarkerRef = useRef(null); // Ref para el marcador del GPS
+  const mapInstance = useRef(null);
+  const markersLayer = useRef(null);
+  const userMarkerLayer = useRef(null);
+  const [isLocating, setIsLocating] = useState(false);
 
   useEffect(() => {
-    let isMounted = true;
-    const container = L.DomUtil.get('real-map');
-    if (container != null) { container._leaflet_id = null; }
+    // 1. INICIALIZAR EL MAPA
+    if (!mapInstance.current && mapRef.current) {
+      mapInstance.current = L.map(mapRef.current, { 
+        preferCanvas: true, 
+        zoomControl: false 
+      }).setView([-33.4489, -70.6693], 13); // Santiago Centro
 
-    const map = L.map('real-map', { preferCanvas: true, zoomControl: false }).setView([-33.4489, -70.6693], 13);
-    
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution: '©OpenStreetMap ©CartoDB'
-    }).addTo(map);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '©OpenStreetMap'
+      }).addTo(mapInstance.current);
 
-    L.control.zoom({ position: 'bottomright' }).addTo(map);
+      markersLayer.current = L.layerGroup().addTo(mapInstance.current);
+      userMarkerLayer.current = L.layerGroup().addTo(mapInstance.current);
+    }
 
-    mapRef.current = map;
-    markersLayerRef.current = L.layerGroup().addTo(map);
+    // 2. ACTUALIZAR PINES
+    if (markersLayer.current && mapInstance.current) {
+      markersLayer.current.clearLayers();
+      parkings.forEach(p => {
+        const isFull = p.occupied_spots >= p.total_spots;
+        const markerColor = isFull ? '#ef4444' : '#10b981';
+        const isFocused = focusedSpot && focusedSpot.id === p.id; // ¿Es el seleccionado?
 
-    return () => { isMounted = false; map.remove(); };
-  }, []);
+        const customIcon = L.divIcon({
+          className: 'custom-pin',
+          // INNOVACIÓN: Si está seleccionado, el pin brilla y es un poco más grande
+          html: `<div style="background-color: ${markerColor}; width: ${isFocused ? '34px' : '28px'}; height: ${isFocused ? '34px' : '28px'}; border-radius: 50%; border: ${isFocused ? '4px' : '3px'} solid white; box-shadow: 0 0 ${isFocused ? '20px' : '10px'} ${markerColor}; display: flex; align-items: center; justify-content: center; transition: all 0.3s;"><i class="fa-solid fa-car" style="color: white; font-size: ${isFocused ? '14px' : '12px'};"></i></div>`,
+          iconSize: isFocused ? [34, 34] : [28, 28],
+          iconAnchor: isFocused ? [17, 17] : [14, 14]
+        });
 
-  useEffect(() => {
-    if (!mapRef.current || !markersLayerRef.current || !parkings) return;
-
-    markersLayerRef.current.clearLayers();
-    markersMapRef.current = {}; 
-
-    parkings.forEach(spot => {
-      const occupancy = spot.occupied_spots / spot.total_spots;
-      const statusClass = occupancy > 0.85 ? 'red' : (occupancy > 0.5 ? 'orange' : 'green');
-      const hexColor = occupancy > 0.85 ? '#ef4444' : (occupancy > 0.5 ? '#f59e0b' : '#10b981');
-
-      const customIcon = L.divIcon({
-        className: 'leaflet-div-icon',
-        html: `<div class="parking-marker parking-marker-${statusClass}" style="box-shadow: 0 0 10px ${hexColor}">P</div>`,
-        iconSize: [24, 24],
-        iconAnchor: [12, 12]
+        const marker = L.marker([p.lat, p.lng], { icon: customIcon })
+          .bindPopup(`<strong style="color:#333;">${p.nombre}</strong><br/><span style="color:${markerColor}">${isFull ? 'LLENO' : 'Disponible'}</span>`)
+          .addTo(markersLayer.current);
+          
+        if(isFocused) marker.openPopup();
       });
-
-      const marker = L.marker([spot.lat, spot.lng], { icon: customIcon })
-      .bindPopup(`
-        <div style="color: #1e293b; font-family: sans-serif; padding: 5px;">
-          <strong style="font-size: 1.1rem; color: ${hexColor};">${spot.nombre}</strong><br/>
-          <span style="color: #64748b; font-size: 0.9rem;">Anfitrión: ${spot.arrendador}</span><br/>
-          <hr style="margin: 8px 0; border: 0.5px solid #e2e8f0;"/>
-          <b style="color: black; font-size: 1rem;">Libres: ${spot.total_spots - spot.occupied_spots}</b>
-        </div>
-      `);
-
-      markersLayerRef.current.addLayer(marker);
-      markersMapRef.current[spot.id] = marker;
-    });
-  }, [parkings]); 
-
-  useEffect(() => {
-    if (!mapRef.current || !markersMapRef.current || !selectedParkingId) return;
-    const selectedMarker = markersMapRef.current[selectedParkingId];
-    if (selectedMarker) {
-      mapRef.current.flyTo(selectedMarker.getLatLng(), 16, { animate: true, duration: 1.5 });
-      selectedMarker.openPopup();
     }
-  }, [selectedParkingId]); 
+  }, [parkings, focusedSpot]);
 
-  // INNOVACIÓN FASE 2: Dibujar y Volar al marcador del usuario
+  // 3. VOLAR HACIA EL ESTACIONAMIENTO SELECCIONADO
   useEffect(() => {
-    if (!mapRef.current || !userLocation) return;
-
-    if (userMarkerRef.current) {
-      mapRef.current.removeLayer(userMarkerRef.current);
+    if (focusedSpot && mapInstance.current) {
+      mapInstance.current.flyTo([focusedSpot.lat, focusedSpot.lng], 17, {
+        animate: true,
+        duration: 1.2
+      });
     }
+  }, [focusedSpot]);
 
-    const userIcon = L.divIcon({
-      className: 'leaflet-div-icon',
-      html: `<div class="parking-marker" style="background-color: var(--primary); box-shadow: 0 0 15px var(--primary); border: 2px solid white; font-size: 8px;">TÚ</div>`,
-      iconSize: [26, 26],
-      iconAnchor: [13, 13]
-    });
+  // Botón GPS con Efecto Radar
+  const locateUser = () => {
+    if (!navigator.geolocation) { alert("GPS no soportado."); return; }
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        if (onUserLocate) onUserLocate({ lat: latitude, lng: longitude });
 
-    userMarkerRef.current = L.marker([userLocation.lat, userLocation.lng], { icon: userIcon })
-      .addTo(mapRef.current)
-      .bindPopup('<b style="color:black;">Tu ubicación actual</b>');
+        mapInstance.current.flyTo([latitude, longitude], 16, { animate: true, duration: 1.5 });
+        userMarkerLayer.current.clearLayers();
 
-    mapRef.current.flyTo([userLocation.lat, userLocation.lng], 15, { animate: true, duration: 1.5 });
-  }, [userLocation]);
+        const userIcon = L.divIcon({
+          className: 'user-gps-pin',
+          html: `<div style="position: relative; width: 20px; height: 20px;"><div style="position: absolute; width: 100%; height: 100%; background: #3b82f6; border-radius: 50%; border: 3px solid white; z-index: 2;"></div><div style="position: absolute; width: 100%; height: 100%; background: #3b82f6; border-radius: 50%; animation: pulseRing 1.5s infinite; z-index: 1;"></div></div>`,
+          iconSize: [20, 20],
+          iconAnchor: [10, 10]
+        });
 
-  return null;
+        L.marker([latitude, longitude], { icon: userIcon }).addTo(userMarkerLayer.current);
+        setIsLocating(false);
+      },
+      () => { alert("Permiso denegado."); setIsLocating(false); }
+    );
+  };
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes pulseRing { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(3.5); opacity: 0; } }
+      `}} />
+      <div ref={mapRef} style={{ width: '100%', height: '100%', zIndex: 1 }} />
+      <button onClick={locateUser} disabled={isLocating} style={{ position: 'absolute', bottom: '30px', right: '20px', zIndex: 1000, background: '#3b82f6', color: 'white', border: 'none', borderRadius: '50%', width: '55px', height: '55px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', cursor: isLocating ? 'not-allowed' : 'pointer', boxShadow: '0 4px 15px rgba(0,0,0,0.5)' }}>
+        {isLocating ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-location-crosshairs"></i>}
+      </button>
+    </div>
+  );
 }
