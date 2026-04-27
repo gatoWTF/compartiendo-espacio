@@ -4,7 +4,6 @@ import { supabase } from '../../../lib/supabase';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 
-// RUTA ARREGLADA (3 NIVELES)
 const MiniMapComponent = dynamic(() => import('../../../components/MiniMap'), {
   ssr: false,
   loading: () => (
@@ -26,6 +25,10 @@ export default function DashboardPage() {
   const [lat, setLat] = useState('');
   const [lng, setLng] = useState('');
   const [totalSpots, setTotalSpots] = useState(1);
+  
+  // INNOVACIÓN: Estado para creación de espacios PMR
+  const [esPmr, setEsPmr] = useState(false);
+  
   const [selectedIds, setSelectedIds] = useState([]);
   const [toast, setToast] = useState(null);
 
@@ -49,7 +52,6 @@ export default function DashboardPage() {
       if (!error) setMyParkings(data || []);
       setLoading(false);
     };
-
     checkUserAndFetchData();
   }, [router]);
 
@@ -72,15 +74,23 @@ export default function DashboardPage() {
     const { data: userData } = await supabase.auth.getUser();
     const nombreArrendador = userData.user.user_metadata?.nombre_completo || userData.user.email.split('@')[0]; 
 
+    // INNOVACIÓN: Guardar el flag es_pmr y convertir lat/lng a PostGIS geography nativo
     const { data, error } = await supabase.from('estacionamientos').insert([{
-      nombre, arrendador: nombreArrendador, lat: parseFloat(lat), lng: parseFloat(lng),
-      total_spots: parseInt(totalSpots), occupied_spots: 0, user_id: userData.user.id 
+      nombre, 
+      arrendador: nombreArrendador, 
+      lat: parseFloat(lat), 
+      lng: parseFloat(lng),
+      total_spots: parseInt(totalSpots), 
+      occupied_spots: 0, 
+      user_id: userData.user.id,
+      es_pmr: esPmr,
+      ubicacion: `SRID=4326;POINT(${parseFloat(lng)} ${parseFloat(lat)})` // Sintaxis WKT para PostGIS
     }]).select();
 
     if (!error && data) {
       setMyParkings([data[0], ...myParkings]);
-      setNombre(''); setDireccion(''); setLat(''); setLng(''); setTotalSpots(1);
-      showToast("¡Espacio publicado!", "success");
+      setNombre(''); setDireccion(''); setLat(''); setLng(''); setTotalSpots(1); setEsPmr(false);
+      showToast("¡Espacio publicado con éxito!", "success");
     } else { showToast("Error: " + error.message, "error"); }
   };
 
@@ -161,6 +171,12 @@ export default function DashboardPage() {
               <div className="input-group" style={{ flex: 2, background: 'rgba(0,0,0,0.3)' }}><i className="fa-solid fa-signature"></i><input type="text" placeholder="Nombre Comercial" value={nombre} onChange={e => setNombre(e.target.value)} required /></div>
               <div className="input-group" style={{ flex: 1, background: 'rgba(0,0,0,0.3)' }}><i className="fa-solid fa-car-side"></i><input type="number" min="1" placeholder="Cupos" value={totalSpots} onChange={e => setTotalSpots(e.target.value)} required /></div>
             </div>
+
+            {/* INNOVACIÓN: Casilla de Verificación PMR */}
+            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(56, 189, 248, 0.1)', border: '1px solid rgba(56, 189, 248, 0.3)', padding: '12px', borderRadius: '8px', cursor: 'pointer' }}>
+              <input type="checkbox" checked={esPmr} onChange={(e) => setEsPmr(e.target.checked)} style={{ width: '18px', height: '18px', accentColor: '#38bdf8' }} />
+              <span style={{ color: 'white', fontSize: '0.95rem' }}><i className="fa-solid fa-wheelchair" style={{ color: '#38bdf8', marginRight: '5px' }}></i> Zona Prioritaria (Movilidad Reducida)</span>
+            </label>
             
             <button type="submit" className="btn-primary hover-elevate" style={{ padding: '16px', fontSize: '1.1rem', borderRadius: '10px', fontWeight: 'bold' }}><i className="fa-solid fa-cloud-arrow-up"></i> Publicar en la Red</button>
           </form>
@@ -190,7 +206,9 @@ export default function DashboardPage() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
                       <input type="checkbox" checked={isSelected} onChange={() => toggleSelection(parking.id)} style={{ width: '22px', height: '22px', cursor: 'pointer', accentColor: '#ef4444' }} />
                       <div>
-                        <h4 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '700' }}>{parking.nombre}</h4>
+                        <h4 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {parking.nombre} {parking.es_pmr && <i className="fa-solid fa-wheelchair" style={{ color: '#38bdf8', fontSize: '1rem' }} title="Zona PMR"></i>}
+                        </h4>
                         <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
                           <span className={`badge ${isFull ? '' : 'green'}`} style={{ backgroundColor: isFull ? 'rgba(239, 68, 68, 0.2)' : '', color: isFull ? '#f87171' : '', padding: '4px 10px' }}>{isFull ? 'Lleno' : 'Disponible'}</span>
                           <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', background: 'rgba(0,0,0,0.3)', padding: '2px 8px', borderRadius: '12px' }}><i className="fa-solid fa-car" style={{ marginRight: '5px' }}></i> {parking.total_spots} cupos</span>
