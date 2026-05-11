@@ -2,14 +2,30 @@ import { supabase } from '@parkings/supabase-db';
 import { NextResponse } from 'next/server';
 
 export async function POST(request) {
-  const { parkingId, userId } = await request.json();
+  try {
+    const { estacionamiento_id, conductor_id, patente } = await request.json();
 
-  // Lógica de bloqueo con TTL (bloquea la plaza por 5 min)
-  const { data, error } = await supabase
-    .from('reservas')
-    .insert([{ parking_id: parkingId, user_id: userId, status: 'pending' }]);
+    // 1. Iniciar Transacción / Patrón Saga (Estado Pendiente)
+    const { data, error } = await supabase
+      .from('reservas')
+      .insert([{ 
+        estacionamiento_id, 
+        conductor_id, 
+        patente_registrada: patente, 
+        estado: 'pendiente' 
+      }])
+      .select();
 
-  if (error) return NextResponse.json({ error: "Plaza ocupada o error" }, { status: 400 });
-  
-  return NextResponse.json({ message: "Reserva iniciada (Saga Step 1)", data });
+    if (error) throw error;
+
+    return NextResponse.json({ 
+      success: true, 
+      message: "Pre-reserva generada con éxito (TTL iniciado)",
+      reserva: data[0]
+    }, { status: 201 });
+
+  } catch (error) {
+    // Compensación en caso de fallo (Saga)
+    return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+  }
 }

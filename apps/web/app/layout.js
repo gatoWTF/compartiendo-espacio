@@ -1,14 +1,19 @@
-import "./globals.css";
+import './globals.css';
 
 export const metadata = {
-  title: "Parking's Together",
-  description: "Sistema de gestión de estacionamientos",
+  title: "Compartiendo Espacio",
+  description: "Red de estacionamientos P2P",
 };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="es">
-      <body>{children}</body>
+      <head>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+      </head>
+      <body>
+        {children}
+      </body>
     </html>
   );
 }
