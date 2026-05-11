@@ -1,6 +1,7 @@
 {
   "name": "parkings-together-monorepo",
   "private": true,
+  "packageManager": "npm@10.0.0",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -8,14 +9,9 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
-    "test": "turbo run test",
-    "test:coverage": "turbo run test -- --coverage"
+    "test": "turbo run test"
   },
   "devDependencies": {
-    "turbo": "latest",
-    "jest": "^30.4.2",
-    "@testing-library/react": "^16.3.2",
-    "@testing-library/jest-dom": "^6.9.1",
-    "jest-environment-jsdom": "^30.4.1"
+    "turbo": "latest"
   }
 }
