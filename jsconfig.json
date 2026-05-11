@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "ignoreDeprecations": "6.0",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./apps/web/*"],
+      "@parkings/supabase-db": ["./packages/supabase-db/index.js"]
+    }
+  },
+  "exclude": ["node_modules", ".next"]
+}
