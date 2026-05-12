@@ -1,76 +1,40 @@
-'use client';
-import { useState, useEffect } from 'react';
-import { supabase } from '@parkings/supabase-db'; // Importación desde el paquete compartido
-import { useRouter } from 'next/navigation';
-import dynamic from 'next/dynamic';
+import Link from 'next/link';
 
-const MapComponent = dynamic(() => import('../components/Map'), { 
-  ssr: false,
-  loading: () => <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(15, 23, 42, 0.8)' }}><i className="fa-solid fa-satellite-dish fa-spin" style={{ fontSize: '3rem', color: '#3b82f6' }}></i></div>
-});
-
-export default function HomePage() {
-  const [session, setSession] = useState(null);
-  const [filteredParkings, setFilteredParkings] = useState([]);
-  const [comunaFiltro, setComunaFiltro] = useState('');
-  const [radioKm, setRadioKm] = useState(5); 
-  const [userLocation, setUserLocation] = useState(null);
-  const [filtroPmr, setFiltroPmr] = useState(false);
-  const [selectedSpot, setSelectedSpot] = useState(null);
-  const router = useRouter();
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
-  }, []);
-
-  useEffect(() => {
-    const fetchParkings = async () => {
-      let query = supabase.from('estacionamientos').select('*'); // Consulta base
-      if (filtroPmr) query = query.eq('es_pmr', true);
-      
-      const { data } = await query;
-      let results = data || [];
-
-      if (comunaFiltro.trim()) {
-        results = results.filter(p => p.nombre.toLowerCase().includes(comunaFiltro.toLowerCase()));
-      }
-      setFilteredParkings(results);
-    };
-    fetchParkings();
-  }, [filtroPmr, comunaFiltro]);
-
+export default function LandingPage() {
   return (
-    <div className="app-container">
-      <aside className="sidebar">
-        <div className="logo-container">
-          <i className="fa-solid fa-map-location-dot logo-icon"></i>
-          <h2>Parking's <span>Together</span></h2>
+    <main style={{ padding: '0 20px', textAlign: 'center', marginTop: '100px' }}>
+      <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+        <span style={{ color: 'var(--primary)', fontWeight: 'bold', letterSpacing: '2px' }}>PROYECTO BETA</span>
+        <h1 style={{ fontSize: '4rem', fontWeight: '800', margin: '20px 0', lineHeight: '1.1' }}>
+          La Red de Estacionamientos <br/> <span style={{ color: 'var(--primary)' }}>P2P de Chile</span>
+        </h1>
+        <p style={{ color: 'var(--text-muted)', fontSize: '1.2rem', marginBottom: '40px' }}>
+          Optimiza tu tiempo, reduce emisiones y encuentra plazas exclusivas PMR en segundos. 
+          La solución inteligente para la movilidad urbana.
+        </p>
+        <div style={{ display: 'flex', gap: '20px', justifyContent: 'center' }}>
+          <Link href="/mapa" className="btn-main" style={{ fontSize: '1.1rem' }}>Empezar a buscar</Link>
+          <Link href="/sobre-mi" className="glass" style={{ padding: '12px 24px', color: 'white', textDecoration: 'none', fontWeight: 'bold' }}>Saber más</Link>
         </div>
-        
-        <div style={{ background: 'rgba(59, 130, 246, 0.05)', padding: '15px', borderRadius: '12px' }}>
-          <div className="input-group">
-            <i className="fa-solid fa-magnifying-glass"></i>
-            <input type="text" placeholder="Buscar comuna..." value={comunaFiltro} onChange={(e) => setComunaFiltro(e.target.value)} />
-          </div>
-          <div style={{ marginTop: '15px' }}>
-            <label style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Radio: {radioKm}km</label>
-            <input type="range" min="1" max="50" value={radioKm} onChange={(e) => setRadioKm(e.target.value)} style={{ width: '100%' }} />
-          </div>
-        </div>
+      </div>
 
-        <div className="arrendadores-list">
-          {filteredParkings.map(p => (
-            <div key={p.id} className="arrendador-card" onClick={() => setSelectedSpot(p)}>
-              <h4>{p.nombre}</h4>
-              <p>{p.total_spots - p.occupied_spots} disponibles</p>
-            </div>
-          ))}
+      <div style={{ marginTop: '100px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', maxWidth: '1000px', margin: '100px auto' }}>
+        <div className="glass" style={{ padding: '30px' }}>
+          <i className="fa-solid fa-bolt" style={{ fontSize: '2rem', color: 'var(--primary)' }}></i>
+          <h3 style={{ marginTop: '15px' }}>Baja Latencia</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '10px' }}>Búsquedas rápidas gracias al motor PostGIS.</p>
         </div>
-      </aside>
-
-      <main className="main-content" style={{ padding: 0 }}>
-        <MapComponent parkings={filteredParkings} focusedSpot={selectedSpot} onUserLocate={setUserLocation} />
-      </main>
-    </div>
+        <div className="glass" style={{ padding: '30px' }}>
+          <i className="fa-solid fa-wheelchair" style={{ fontSize: '2rem', color: 'var(--primary)' }}></i>
+          <h3 style={{ marginTop: '15px' }}>Inclusividad</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '10px' }}>Priorización real de plazas para movilidad reducida.</p>
+        </div>
+        <div className="glass" style={{ padding: '30px' }}>
+          <i className="fa-solid fa-shield-halved" style={{ fontSize: '2rem', color: 'var(--primary)' }}></i>
+          <h3 style={{ marginTop: '15px' }}>Seguridad</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '10px' }}>Transacciones seguras y trazables.</p>
+        </div>
+      </div>
+    </main>
   );
 }
