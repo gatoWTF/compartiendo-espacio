@@ -1,1 +1,2 @@
-{"timestamp":"00:00:01.755","source":"Server","level":"LOG","message":""}
+{"timestamp":"00:00:04.351","source":"Server","level":"WARN","message":"⚠ Slow filesystem detected. The benchmark took 236ms. If C:\\stack3\\compartiendo-espacio\\apps/bff/.next/dev is a network drive, consider moving it to a local folder.\nSee more: https://nextjs.org/docs/app/guides/local-development"}
+{"timestamp":"00:00:05.674","source":"Server","level":"LOG","message":""}

@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { api } from '@/src/lib/api'; // Importamos nuestra capa de abstracción
+import { api } from '../src/lib/api'; // Importamos nuestra capa de abstracción
 
 export default function ProfilePage() {
   const [user, setUser] = useState(null);
