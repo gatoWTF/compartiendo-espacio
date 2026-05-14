@@ -1,1 +1,8 @@
 {"timestamp":"00:00:05.825","source":"Server","level":"LOG","message":""}
+{"timestamp":"00:11:43.434","source":"Server","level":"ERROR","message":"⨯ Error: supabaseUrl is required."}
+{"timestamp":"00:11:45.063","source":"Server","level":"ERROR","message":"⨯ Error: supabaseUrl is required."}
+{"timestamp":"00:11:47.984","source":"Server","level":"ERROR","message":"⨯ Error: supabaseUrl is required."}
+{"timestamp":"00:13:01.150","source":"Server","level":"ERROR","message":"⨯ Error: supabaseUrl is required."}
+{"timestamp":"00:13:01.435","source":"Server","level":"ERROR","message":"⨯ Error: supabaseUrl is required."}
+{"timestamp":"00:13:17.593","source":"Server","level":"ERROR","message":"⨯ Error: supabaseUrl is required."}
+{"timestamp":"00:13:17.738","source":"Server","level":"ERROR","message":"⨯ Error: supabaseUrl is required."}

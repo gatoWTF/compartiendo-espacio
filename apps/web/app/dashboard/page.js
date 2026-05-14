@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { api } from '../src/lib/api';// Usamos nuestra API
+import { api } from '../scr/lib/api';// Usamos nuestra API
 
 const MiniMapComponent = dynamic(() => import('../../components/MiniMap'), { 
   ssr: false,

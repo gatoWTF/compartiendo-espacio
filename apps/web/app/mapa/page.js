@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 // Asegúrate de que esta ruta sea la misma que te funcionó en el Dashboard
-import { api } from '../../src/lib/api'; 
+import { api } from '../scr/lib/api'; 
 
 // IMPORTANTE: Importamos el mapa dinámicamente, apagando el SSR (Server Side Rendering)
 const MapComponent = dynamic(() => import('../../components/Map'), { 
