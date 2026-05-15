@@ -1,22 +1,21 @@
+// Archivo: package.json
 {
-  "name": "parkings-together-monorepo",
+  "name": "compartiendo-espacio",
   "private": true,
-  "packageManager": "npm@10.0.0",
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
   "scripts": {
-    "dev": "turbo run dev",
     "build": "turbo run build",
-    "test": "turbo run test"
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "clean": "turbo run clean && rm -rf node_modules"
   },
   "devDependencies": {
     "turbo": "latest"
   },
-  "dependencies": {
-    "@supabase/ssr": "^0.10.3",
-    "@supabase/supabase-js": "^2.105.4",
-    "leaflet": "^1.9.4"
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
