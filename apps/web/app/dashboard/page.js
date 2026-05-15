@@ -1,10 +1,10 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { supabase } from '@parkings/supabase-db'; // RUTA CORREGIDA
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
+import { api } from '../scr/lib/api';// Usamos nuestra API
 
-const MiniMapComponent = dynamic(() => import('../../components/MiniMap'), { // RUTA CORREGIDA
+const MiniMapComponent = dynamic(() => import('../../components/MiniMap'), { 
   ssr: false,
   loading: () => (
     <div style={{ height: '350px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.2)', borderRadius: '12px' }}>
@@ -32,12 +32,18 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const checkUserAndFetchData = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.push('/auth'); return; }
-      setSession(session);
+      // Leemos la sesión desde el LocalStorage (creada en la página de Auth)
+      const sessionStr = window.localStorage.getItem('sb-yours-app-token'); // Revisa que este nombre coincida en tu navegador
+      if (!sessionStr) { router.push('/auth'); return; }
+      
+      const userSession = JSON.parse(sessionStr);
+      setSession(userSession);
 
-      const { data, error } = await supabase.from('estacionamientos').select('*').eq('user_id', session.user.id).order('created_at', { ascending: false });
-      if (!error) setMyParkings(data || []);
+      // Le pedimos los datos a nuestro microservicio, no a Supabase
+      const result = await api.mapas.getMisEstacionamientos(userSession.user.id);
+      if (result.success) {
+        setMyParkings(result.data || []);
+      }
       setLoading(false);
     };
     checkUserAndFetchData();
@@ -55,35 +61,53 @@ export default function DashboardPage() {
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!lat || !lng) { showToast("Fija el pin rojo en el mapa.", "error"); return; }
-    const { data: userData } = await supabase.auth.getUser();
-    const nombreArrendador = userData.user.user_metadata?.nombre_completo || userData.user.email.split('@')[0]; 
+    
+    const nombreArrendador = session.user.user_metadata?.nombre_completo || session.user.email.split('@')[0]; 
 
-    const { data, error } = await supabase.from('estacionamientos').insert([{
-      nombre, arrendador: nombreArrendador, lat: parseFloat(lat), lng: parseFloat(lng), total_spots: parseInt(totalSpots), occupied_spots: 0, user_id: userData.user.id, es_pmr: esPmr, ubicacion: `SRID=4326;POINT(${parseFloat(lng)} ${parseFloat(lat)})`
-    }]).select();
+    // LLAMAMOS A NUESTRO MICROSERVICIO (API)
+    const result = await api.mapas.crearEstacionamiento({
+      nombre, 
+      arrendador: nombreArrendador, 
+      lat: parseFloat(lat), 
+      lng: parseFloat(lng), 
+      totalSpots: parseInt(totalSpots), 
+      esPmr, 
+      userId: session.user.id
+    });
 
-    if (!error && data) {
-      setMyParkings([data[0], ...myParkings]);
+    if (result.success && result.data) {
+      setMyParkings([result.data, ...myParkings]);
       setNombre(''); setDireccion(''); setLat(''); setLng(''); setTotalSpots(1); setEsPmr(false);
       showToast("¡Espacio publicado con éxito!", "success");
+    } else {
+      showToast("Error al publicar.", "error");
     }
   };
 
   const updateOccupancy = async (id, currentOccupied, total, change) => {
+    // Nota: Si quieres que el botón de sumar/restar cupos también funcione sin Supabase, 
+    // debes crear una función PUT en tu microservicio. Por ahora, solo actualizamos la vista local.
     const newOccupied = currentOccupied + change;
     if (newOccupied < 0 || newOccupied > total) return;
     setMyParkings(myParkings.map(p => p.id === id ? { ...p, occupied_spots: newOccupied } : p));
-    await supabase.from('estacionamientos').update({ occupied_spots: newOccupied }).eq('id', id);
   };
 
   const toggleSelection = (id) => selectedIds.includes(id) ? setSelectedIds(selectedIds.filter(i => i !== id)) : setSelectedIds([...selectedIds, id]);
   const selectAll = () => selectedIds.length === myParkings.length ? setSelectedIds([]) : setSelectedIds(myParkings.map(p => p.id));
+  
   const handleBulkDelete = async () => {
     if (selectedIds.length === 0) return;
     const confirmacion = window.confirm(`¿Seguro de ELIMINAR ${selectedIds.length} estacionamiento(s)?`);
     if (!confirmacion) return;
-    const { error } = await supabase.from('estacionamientos').delete().in('id', selectedIds);
-    if (!error) { setMyParkings(myParkings.filter(p => !selectedIds.includes(p.id))); setSelectedIds([]); showToast(`${selectedIds.length} espacio(s) eliminado(s).`, "success"); }
+
+    // LLAMAMOS AL MICROSERVICIO
+    const result = await api.mapas.eliminarEstacionamientos(selectedIds);
+    
+    if (result.success) { 
+      setMyParkings(myParkings.filter(p => !selectedIds.includes(p.id))); 
+      setSelectedIds([]); 
+      showToast(`${selectedIds.length} espacio(s) eliminado(s).`, "success"); 
+    }
   };
 
   if (loading) return <div style={{ height: '80vh', display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'white' }}><i className="fa-solid fa-circle-notch fa-spin"></i></div>;
@@ -92,6 +116,7 @@ export default function DashboardPage() {
     <section className="view-content" style={{ padding: '20px', position: 'relative' }}>
       <div className="dashboard-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', borderBottom: '1px solid var(--border-glass)', paddingBottom: '20px' }}>
         <div><h2 style={{ fontSize: '2.2rem', color: 'var(--primary)', margin: 0, fontWeight: '800' }}> Panel de Control</h2></div>
+        {toast && <div style={{ background: toast.type === 'success' ? '#10b981' : '#ef4444', color: 'white', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold' }}>{toast.msg}</div>}
       </div>
 
       <div style={{ display: 'flex', gap: '30px', flexWrap: 'wrap' }}>
