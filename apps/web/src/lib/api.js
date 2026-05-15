@@ -1,46 +1,68 @@
 // Archivo: apps/web/src/lib/api.js
 
-const AUTH_URL = process.env.NEXT_PUBLIC_AUTH_URL || 'http://localhost:3001';
-const MAPAS_URL = process.env.NEXT_PUBLIC_MAPAS_URL || 'http://localhost:3002';
-const RESERVAS_URL = process.env.NEXT_PUBLIC_RESERVAS_URL || 'http://localhost:3003';
+/**
+ * PATRÓN DE DISEÑO: Facade & Singleton (BFF Simulado para Vercel)
+ * CUMPLE REGLA 1: Cero interacción directa con Supabase. Todo es HTTP REST.
+ * OPTIMIZACIÓN: Interceptores integrados para auth de freakymustchar ecosystem.
+ */
 
-// Autenticación
-export async function login(email, password) {
-  const res = await fetch(`${AUTH_URL}/api/v1/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-  });
-  return res.json();
-}
-
-export async function register(email, password) {
-  const res = await fetch(`${AUTH_URL}/api/v1/auth/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-  });
-  return res.json();
-}
-
-// Mapas / Geolocalización
-export async function searchParkings(lat, lng, radius) {
-  const res = await fetch(
-    `${MAPAS_URL}/api/v1/search?lat=${lat}&lng=${lng}&radius=${radius}`
-  );
-  return res.json();
-}
-
-// Reservas
-export async function createReserva(data) {
-  const token = localStorage.getItem('token');
-  const res = await fetch(`${RESERVAS_URL}/api/v1/reserve`, {
-    method: 'POST',
-    headers: {
+class ApiService {
+  /**
+   * Core Request Handler con interceptor de tokens
+   */
+  static async request(endpoint, options = {}) {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('parkings_token') : null;
+    const headers = {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(data),
-  });
-  return res.json();
+      'X-Client-Platform': 'web-p2p',
+      ...(token && { Authorization: `Bearer ${token}` }),
+      ...options.headers,
+    };
+
+    try {
+      // Las rutas relativas /api/* son procesadas por los rewrites de next.config.mjs
+      const response = await fetch(endpoint, { ...options, headers });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Error crítico en nodo P2P: ${response.status}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.error(`[SYS_FAILURE] Fallo en conexión al endpoint ${endpoint}:`, error);
+      throw error;
+    }
+  }
+
+  // ==========================================
+  // MICROSERVICIO 1: AUTENTICACIÓN (Puerto 3001)
+  // ==========================================
+  static auth = {
+    login: (credentials) => 
+      this.request('/api/auth/login', { method: 'POST', body: JSON.stringify(credentials) }),
+    register: (data) => 
+      this.request('/api/auth/register', { method: 'POST', body: JSON.stringify(data) })
+  };
+
+  // ==========================================
+  // MICROSERVICIO 2: RADAR & GEOLOCALIZACIÓN (Puerto 3002)
+  // ==========================================
+  static radar = {
+    // Injecta zona fallback (Huechuraba) si el dispositivo no soporta GPS
+    scanArea: (lat = -33.3670, lng = -70.6385, radius = 5) => 
+      this.request(`/api/mapas?lat=${lat}&lng=${lng}&radius=${radius}`, { method: 'GET' })
+  };
+
+  // ==========================================
+  // MICROSERVICIO 3: TRANSACCIONES P2P (Puerto 3003)
+  // ==========================================
+  static reserva = {
+    crear: (reservaData) => 
+      this.request('/api/reservas', { method: 'POST', body: JSON.stringify(reservaData) }),
+    verificarDisponibilidad: (parkingId) =>
+      this.request(`/api/reservas/check/${parkingId}`, { method: 'GET' })
+  };
 }
+
+export default ApiService;

@@ -1,15 +1,22 @@
 {
   "version": 2,
-  "builds": [
+  "installCommand": "npm install",
+  "buildCommand": "turbo run build",
+  "devCommand": "turbo run dev",
+  "framework": "nextjs",
+  "regions": ["scl1"],
+  "rewrites": [
     {
-      "src": "src/index.js",
-      "use": "@vercel/node"
-    }
-  ],
-  "routes": [
+      "source": "/api/auth/:path*",
+      "destination": "https://auth-ms-tu-url.vercel.app/api/v1/auth/:path*"
+    },
     {
-      "src": "/(.*)",
-      "dest": "src/index.js"
+      "source": "/api/mapas/:path*",
+      "destination": "https://mapas-ms-tu-url.vercel.app/api/v1/search/:path*"
+    },
+    {
+      "source": "/api/reservas/:path*",
+      "destination": "https://reservas-ms-tu-url.vercel.app/api/v1/reserve/:path*"
     }
   ]
 }
