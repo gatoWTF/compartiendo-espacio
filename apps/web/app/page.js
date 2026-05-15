@@ -4,7 +4,6 @@ import Link from 'next/link';
 export default function HomePage() {
   return (
     <div className="landing-wrapper">
-      {/* ─── SECCIÓN HERO (PRINCIPAL) ─── */}
       <section className="hero-section">
         <div className="hero-content">
           <div className="badge-beta">COMPARTIENDO ESPACIO (BETA) v1.0</div>
@@ -28,14 +27,12 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Decoración Visual de Radar */}
         <div className="hero-visual">
           <div className="radar-circle"></div>
           <div className="radar-scanner"></div>
         </div>
       </section>
 
-      {/* ─── SECCIÓN FEATURES (INNOVACIÓN) ─── */}
       <section className="features-grid">
         <div className="glass-panel feature-card">
           <i className="fa-solid fa-shield-halved"></i>
@@ -54,159 +51,30 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ─── FOOTER DE CRÉDITOS ─── */}
       <footer className="landing-footer">
         <p>Desarrollado por <strong>Gabriel Molina</strong> & <strong>Guillermo Santander</strong></p>
       </footer>
 
       <style jsx>{`
-        .landing-wrapper {
-          min-height: 100vh;
-          padding: 0 5%;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-        }
-
-        .hero-section {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 80px 0;
-          width: 100%;
-          max-width: 1200px;
-          gap: 50px;
-        }
-
+        .landing-wrapper { min-height: 100vh; padding: 0 5%; display: flex; flex-direction: column; align-items: center; }
+        .hero-section { display: flex; align-items: center; justify-content: space-between; padding: 80px 0; width: 100%; max-width: 1200px; gap: 50px; }
         .hero-content { flex: 1; text-align: left; }
-
-        .badge-beta {
-          display: inline-block;
-          padding: 6px 14px;
-          background: rgba(59, 130, 246, 0.1);
-          color: #3b82f6;
-          border-radius: 100px;
-          font-size: 0.75rem;
-          font-weight: 900;
-          letter-spacing: 1.5px;
-          border: 1px solid rgba(59, 130, 246, 0.2);
-          margin-bottom: 25px;
-        }
-
-        .hero-title {
-          font-size: 3.5rem;
-          line-height: 1.1;
-          font-weight: 900;
-          color: white;
-          margin-bottom: 25px;
-        }
-
-        .hero-title span {
-          background: linear-gradient(to right, #3b82f6, #8b5cf6);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-        }
-
-        .hero-description {
-          font-size: 1.1rem;
-          color: #94a3b8;
-          max-width: 500px;
-          line-height: 1.6;
-          margin-bottom: 40px;
-        }
-
-        .hero-actions {
-          display: flex;
-          gap: 20px;
-        }
-
-        /* Radar Visual Decorativo */
-        .hero-visual {
-          flex: 1;
-          height: 400px;
-          position: relative;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%);
-        }
-
-        .radar-circle {
-          width: 300px;
-          height: 300px;
-          border: 1px solid rgba(59, 130, 246, 0.2);
-          border-radius: 50%;
-          position: relative;
-        }
-
-        .radar-scanner {
-          position: absolute;
-          width: 150px;
-          height: 150px;
-          background: conic-gradient(from 0deg, #3b82f6 0deg, transparent 90deg);
-          top: 50px;
-          left: 50px;
-          border-radius: 50%;
-          animation: rotate 4s linear infinite;
-          opacity: 0.3;
-        }
-
-        /* Features Section */
-        .features-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 25px;
-          width: 100%;
-          max-width: 1200px;
-          margin-top: 50px;
-          padding-bottom: 80px;
-        }
-
-        .feature-card {
-          padding: 40px;
-          text-align: center;
-          transition: 0.3s;
-        }
-
-        .feature-card:hover {
-          transform: translateY(-10px);
-          border-color: rgba(59, 130, 246, 0.5);
-        }
-
-        .feature-card i {
-          font-size: 2.5rem;
-          color: #3b82f6;
-          margin-bottom: 20px;
-        }
-
-        .feature-card h3 {
-          margin-bottom: 15px;
-          font-weight: 800;
-        }
-
-        .feature-card p {
-          color: #64748b;
-          font-size: 0.9rem;
-          line-height: 1.5;
-        }
-
-        .landing-footer {
-          margin-top: auto;
-          padding: 40px;
-          color: #475569;
-          font-size: 0.85rem;
-        }
-
-        @keyframes rotate {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-
-        @keyframes rotate {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-
+        .badge-beta { display: inline-block; padding: 6px 14px; background: rgba(59, 130, 246, 0.1); color: #3b82f6; border-radius: 100px; font-size: 0.75rem; font-weight: 900; letter-spacing: 1.5px; border: 1px solid rgba(59, 130, 246, 0.2); margin-bottom: 25px; }
+        .hero-title { font-size: 3.5rem; line-height: 1.1; font-weight: 900; color: white; margin-bottom: 25px; }
+        .hero-title span { background: linear-gradient(to right, #3b82f6, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .hero-description { font-size: 1.1rem; color: #94a3b8; max-width: 500px; line-height: 1.6; margin-bottom: 40px; }
+        .hero-actions { display: flex; gap: 20px; }
+        .hero-visual { flex: 1; height: 400px; position: relative; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%); }
+        .radar-circle { width: 300px; height: 300px; border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 50%; position: relative; }
+        .radar-scanner { position: absolute; width: 150px; height: 150px; background: conic-gradient(from 0deg, #3b82f6 0deg, transparent 90deg); top: 50px; left: 50px; border-radius: 50%; animation: rotate 4s linear infinite; opacity: 0.3; }
+        .features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 25px; width: 100%; max-width: 1200px; margin-top: 50px; padding-bottom: 80px; }
+        .feature-card { padding: 40px; text-align: center; transition: 0.3s; }
+        .feature-card:hover { transform: translateY(-10px); border-color: rgba(59, 130, 246, 0.5); }
+        .feature-card i { font-size: 2.5rem; color: #3b82f6; margin-bottom: 20px; }
+        .feature-card h3 { margin-bottom: 15px; font-weight: 800; }
+        .feature-card p { color: #64748b; font-size: 0.9rem; line-height: 1.5; }
+        .landing-footer { margin-top: auto; padding: 40px; color: #475569; font-size: 0.85rem; }
+        @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @media (max-width: 900px) {
           .hero-section { flex-direction: column; text-align: center; padding: 40px 0; }
           .hero-content { text-align: center; }
