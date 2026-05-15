@@ -1,4 +1,2 @@
-{"timestamp":"00:00:01.379","source":"Server","level":"LOG","message":""}
-{"timestamp":"00:00:11.850","source":"Browser","level":"INFO","message":"%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold"}
-{"timestamp":"00:00:15.852","source":"Browser","level":"LOG","message":"Usando Plaza Norte"}
-{"timestamp":"00:00:15.853","source":"Browser","level":"LOG","message":"Usando Plaza Norte"}
+{"timestamp":"00:00:01.732","source":"Server","level":"LOG","message":""}
+{"timestamp":"00:00:02.886","source":"Browser","level":"INFO","message":"%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold"}

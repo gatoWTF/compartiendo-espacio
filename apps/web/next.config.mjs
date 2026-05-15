@@ -2,28 +2,30 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  transpilePackages: ["@parkings/supabase-db"],
-  // REGLA 1 & VERCEL DEPLOYMENT: Enrutamiento dinámico a los microservicios
-  // Evita problemas de puertos en producción y permite despliegue multi-zona
+  // REGLA 1: El frontend NO transpila supabase-db. Solo los microservicios lo hacen.
   async rewrites() {
+    const authUrl    = process.env.NEXT_PUBLIC_MS_AUTH_URL;
+    const mapasUrl   = process.env.NEXT_PUBLIC_MS_MAPAS_URL;
+    const reservasUrl = process.env.NEXT_PUBLIC_MS_RESERVAS_URL;
+
+    // En desarrollo, los rewrites no se usan porque api.js apunta a localhost directamente
+    if (process.env.NODE_ENV === 'development') return [];
+
+    // En producción, los rewrites son un fallback — api.js ya usa las URLs completas via env vars
+    if (!authUrl || !mapasUrl || !reservasUrl) return [];
+
     return [
       {
         source: '/api/auth/:path*',
-        destination: process.env.NODE_ENV === 'development'
-          ? 'http://localhost:3001/api/v1/auth/:path*'
-          : `${process.env.NEXT_PUBLIC_AUTH_MS_URL}/api/v1/auth/:path*`,
+        destination: `${authUrl}/api/v1/auth/:path*`,
       },
       {
         source: '/api/mapas/:path*',
-        destination: process.env.NODE_ENV === 'development'
-          ? 'http://localhost:3002/api/v1/search/:path*'
-          : `${process.env.NEXT_PUBLIC_MAPAS_MS_URL}/api/v1/search/:path*`,
+        destination: `${mapasUrl}/api/v1/search/:path*`,
       },
       {
         source: '/api/reservas/:path*',
-        destination: process.env.NODE_ENV === 'development'
-          ? 'http://localhost:3003/api/v1/reserve/:path*'
-          : `${process.env.NEXT_PUBLIC_RESERVAS_MS_URL}/api/v1/reserve/:path*`,
+        destination: `${reservasUrl}/api/v1/reserve/:path*`,
       },
     ];
   },
