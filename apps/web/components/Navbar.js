@@ -1,39 +1,79 @@
 'use client';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { supabase } from '@parkings/supabase-db';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 
 export default function Navbar() {
   const [user, setUser] = useState(null);
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => setUser(session?.user || null));
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setUser(session?.user || null));
-    return () => subscription.unsubscribe();
-  }, []);
+    const checkSession = () => {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        try {
+          setUser(JSON.parse(storedUser));
+        } catch (e) {
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
+    };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
+    checkSession();
+    window.addEventListener('storage', checkSession);
+    return () => window.removeEventListener('storage', checkSession);
+  }, [pathname]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('user');
+    setUser(null);
     router.push('/');
   };
 
   return (
-    <nav className="glass" style={{ margin: '20px', padding: '15px 30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: '20px', zIndex: 1000 }}>
-      <Link href="/" style={{ fontSize: '1.2rem', fontWeight: '800', textDecoration: 'none', color: 'white' }}>
-        <span style={{ color: 'var(--primary)' }}>P</span>arking's Together
+    <nav style={{ 
+      margin: '20px 5%', 
+      padding: '15px 30px', 
+      display: 'flex', 
+      justifyContent: 'space-between', 
+      alignItems: 'center', 
+      position: 'sticky', 
+      top: '20px', 
+      zIndex: 2000,
+      background: 'rgba(15, 23, 42, 0.6)', 
+      backdropFilter: 'blur(20px)', 
+      borderRadius: '20px',
+      border: '1px solid rgba(255, 255, 255, 0.08)'
+    }}>
+      
+      {/* ─── LOGO ─── */}
+      <Link href="/" style={{ fontSize: '1.4rem', fontWeight: '900', textDecoration: 'none', color: 'white', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <span style={{ color: '#3b82f6' }}>P</span>arking's Together
       </Link>
-      <div style={{ display: 'flex', gap: '30px', alignItems: 'center' }}>
-        <Link href="/" className="nav-link">Inicio</Link>
-        <Link href="/mapa" className="nav-link">Buscar Plaza</Link>
+
+      {/* ─── ENLACES CON LAS CLASES CORRECTAS DEL CSS ─── */}
+      <div style={{ display: 'flex', gap: '25px', alignItems: 'center' }}>
+        <Link href="/" className="nav-link-cyber">Inicio</Link>
+        <Link href="/mapa" className="nav-link-cyber">Buscar Plaza</Link>
+        <Link href="/sobre-mi" className="nav-link-cyber">Sobre mí</Link>
         
         {user ? (
-          <button onClick={handleLogout} className="glass" style={{ color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '8px 20px', cursor: 'pointer', fontWeight: 'bold' }}>
-            <i className="fa-solid fa-power-off"></i> Salir
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginLeft: '10px', paddingLeft: '15px', borderLeft: '1px solid rgba(255,255,255,0.1)' }}>
+            <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: '600' }}>
+              Hola, <span style={{ color: 'white' }}>{user.nombre || user.email?.split('@')[0]}</span>
+            </span>
+            <button onClick={handleLogout} className="btn-cyber-secondary" style={{ padding: '8px 16px', fontSize: '0.8rem', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.3)' }}>
+              Salir
+            </button>
+          </div>
         ) : (
-          <Link href="/auth" className="btn-main" style={{ fontSize: '0.9rem', padding: '8px 20px' }}>Ingresar</Link>
+          <Link href="/auth" className="btn-cyber-primary" style={{ fontSize: '0.9rem', padding: '10px 24px', marginLeft: '10px' }}>
+            Ingresar
+          </Link>
         )}
       </div>
     </nav>

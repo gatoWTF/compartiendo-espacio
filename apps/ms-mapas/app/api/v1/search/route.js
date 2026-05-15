@@ -1,67 +1,27 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@parkings/supabase-db'; // 🔑 EL FIX: El paquete real
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*', 
+  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
 
-// 1. BUSCAR ESTACIONAMIENTOS (Para el Mapa y el Dashboard)
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+}
+
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
-  const radius = searchParams.get('radius');
-  const userId = searchParams.get('userId');
+  const radius = parseFloat(searchParams.get('radius')) || 5;
 
   try {
-    let query = supabase.from('estacionamientos').select('*').order('created_at', { ascending: false });
-
-    // Si pasamos un userId, filtramos solo los de ese usuario (Para el Dashboard)
-    if (userId) {
-      query = query.eq('user_id', userId);
-    } 
-
-    const { data, error } = await query;
+    // Solo este microservicio toca la BD. Regla de oro respetada.
+    const { data, error } = await supabase.from('estacionamientos').select('*');
     if (error) throw error;
-
-    return NextResponse.json({ success: true, data }, { status: 200 });
+    
+    return NextResponse.json({ success: true, data }, { status: 200, headers: CORS_HEADERS });
   } catch (error) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-  }
-}
-
-// 2. CREAR UN ESTACIONAMIENTO NUEVO
-export async function POST(request) {
-  try {
-    const body = await request.json();
-    const { nombre, arrendador, lat, lng, totalSpots, userId, esPmr } = body;
-
-    const { data, error } = await supabase.from('estacionamientos').insert([{
-      nombre, 
-      arrendador, 
-      lat: parseFloat(lat), 
-      lng: parseFloat(lng), 
-      total_spots: parseInt(totalSpots), 
-      occupied_spots: 0, 
-      user_id: userId, 
-      es_pmr: esPmr, 
-      ubicacion: `SRID=4326;POINT(${parseFloat(lng)} ${parseFloat(lat)})`
-    }]).select();
-
-    if (error) throw error;
-    return NextResponse.json({ success: true, data: data[0] }, { status: 201 });
-  } catch (error) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-  }
-}
-
-// 3. ELIMINAR ESTACIONAMIENTOS
-export async function DELETE(request) {
-  try {
-    const body = await request.json();
-    const { ids } = body;
-
-    const { error } = await supabase.from('estacionamientos').delete().in('id', ids);
-    if (error) throw error;
-
-    return NextResponse.json({ success: true }, { status: 200 });
-  } catch (error) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: error.message }, { status: 500, headers: CORS_HEADERS });
   }
 }
