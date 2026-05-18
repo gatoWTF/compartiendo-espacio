@@ -168,7 +168,7 @@ export default function AuthPage() {
         
         .input-wrap { position: relative; margin-bottom: 20px; transition: all 0.3s; }
         .input-wrap .icon { position: absolute; left: 20px; top: 50%; transform: translateY(-50%); color: #64748b; font-size: 1.1rem; transition: 0.3s; }
-        .input-wrap input { width: 100%; padding: 18px 20px 18px 55px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; color: white; outline: none; transition: 0.3s; font-size: 1rem; }
+        .input-wrap input { width: 100%; box-sizing: border-box; padding: 18px 20px 18px 55px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; color: white; outline: none; transition: 0.3s; font-size: 1rem; }
         .input-wrap input:focus { border-color: #3b82f6; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); background: rgba(0,0,0,0.6); }
         .input-wrap input:focus + .icon, .input-wrap input:not(:placeholder-shown) + .icon { color: #3b82f6; }
         

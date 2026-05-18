@@ -13,6 +13,7 @@ export default function MapaPage() {
   const [userLoc, setUserLoc] = useState({ lat: -33.3601, lng: -70.6925 }); 
   const [parkings, setParkings] = useState([]);
   const [radius, setRadius] = useState(5);
+  const [sortOption, setSortOption] = useState('cercania'); // cercania, precio, rating
   const [selectedSpot, setSelectedSpot] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isCloud, setIsCloud] = useState(false);
@@ -45,7 +46,9 @@ export default function MapaPage() {
 
   const loadParkings = async () => {
     setLoading(true);
-    const data = await fetchRadar(radius, userLoc.lat, userLoc.lng);
+    // Si radius es 100, consideramos rango Global (ej. 9999 km)
+    const effectiveRadius = parseInt(radius) === 100 ? 9999 : radius;
+    const data = await fetchRadar(effectiveRadius, userLoc.lat, userLoc.lng);
     setParkings(data);
     setLoading(false);
   };
@@ -131,22 +134,36 @@ export default function MapaPage() {
         <div className="control-card">
           <div className="label-group">
             <label>RANGO DE ESCANEO</label>
-            <span className="km-value">{radius} KM</span>
+            <span className="km-value">{parseInt(radius) === 100 ? 'GLOBAL 🌍' : `${radius} KM`}</span>
           </div>
-          <input type="range" min="1" max="30" value={radius} onChange={(e) => setRadius(e.target.value)} className="modern-slider" />
+          <input type="range" min="1" max="100" value={radius} onChange={(e) => setRadius(e.target.value)} className="modern-slider" />
+          
+          <div className="filter-group">
+            <select value={sortOption} onChange={(e) => setSortOption(e.target.value)} className="modern-select">
+              <option value="cercania">📍 Ordenar por Cercanía</option>
+              <option value="rating">⭐ Mejor Calificados</option>
+              <option value="precio">💸 Precio (Menor a Mayor)</option>
+            </select>
+          </div>
         </div>
 
         <div className="parking-list-section">
-          <p className="section-tag">NODOS CERCANOS</p>
+          <p className="section-tag">NODOS DISPONIBLES</p>
           {loading ? (
             <div className="radar-scanning">
                <div className="ring"></div>
-               <span>Escaneando sector...</span>
+               <span>Escaneando red...</span>
             </div>
           ) : parkings.length === 0 ? (
-            <div className="no-results">No hay nodos en este radio.</div>
+            <div className="no-results">No hay nodos en este parámetro.</div>
           ) : (
-            parkings.map(p => {
+            [...parkings]
+              .sort((a, b) => {
+                if (sortOption === 'rating') return (b.rating || 5) - (a.rating || 5);
+                if (sortOption === 'precio') return a.precio_hora - b.precio_hora;
+                return 0; // Si es cercanía, ya viene ordenado del backend (PostGIS) o del orden natural del radio.
+              })
+              .map(p => {
               const isFull = p.occupied_spots >= p.total_spots;
               return (
                 <div key={p.id} onClick={() => { setSelectedSpot(p); setMobileMenuOpen(false); }} className={`parking-card-mini ${selectedSpot?.id === p.id ? 'active' : ''}`}>
@@ -229,8 +246,11 @@ export default function MapaPage() {
 
         .control-card { background: rgba(255, 255, 255, 0.03); padding: 20px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.05); }
         .label-group { display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 800; color: #64748b; margin-bottom: 12px; }
-        .km-value { color: #3b82f6; }
-        .modern-slider { width: 100%; accent-color: #3b82f6; cursor: pointer; }
+        .km-value { color: #3b82f6; font-weight: 900; }
+        .modern-slider { width: 100%; accent-color: #3b82f6; cursor: pointer; margin-bottom: 15px; }
+        .filter-group { margin-top: 10px; }
+        .modern-select { width: 100%; padding: 10px; background: rgba(0,0,0,0.5); color: white; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; font-size: 0.85rem; outline: none; cursor: pointer; transition: border-color 0.3s; }
+        .modern-select:hover { border-color: #3b82f6; }
 
         .parking-list-section { flex: 1; display: flex; flex-direction: column; }
         .section-tag { font-size: 0.75rem; font-weight: 900; color: #64748b; letter-spacing: 2px; margin-bottom: 15px; }
