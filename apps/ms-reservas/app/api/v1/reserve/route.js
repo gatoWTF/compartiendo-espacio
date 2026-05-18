@@ -14,7 +14,7 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
 }
 
-// POST: Crear una reserva
+// POST: Crear una reserva (Simulación de Saga/Compensación)
 export async function POST(request) {
   try {
     const body = await request.json();
@@ -27,7 +27,20 @@ export async function POST(request) {
       );
     }
 
-    const { data, error } = await supabase
+    // PASO 1: Verificar disponibilidad actual (Lectura CQRS rápida)
+    const { data: parking, error: errParking } = await supabase
+      .from('estacionamientos')
+      .select('occupied_spots, total_spots')
+      .eq('id', parking_id)
+      .single();
+
+    if (errParking) throw errParking;
+    if (parking.occupied_spots >= parking.total_spots) {
+      return NextResponse.json({ success: false, error: 'El estacionamiento ya está lleno. Transacción rechazada.' }, { status: 409, headers: CORS_HEADERS });
+    }
+
+    // PASO 2: Insertar Reserva
+    const { data: reserva, error: errReserva } = await supabase
       .from('reservas')
       .insert([{
         estacionamiento_id: parking_id,
@@ -39,9 +52,21 @@ export async function POST(request) {
       .select()
       .single();
 
-    if (error) throw error;
+    if (errReserva) throw errReserva;
 
-    return NextResponse.json({ success: true, data }, { status: 201, headers: CORS_HEADERS });
+    // PASO 3: Compensación/Actualización (Aumentar ocupación)
+    const { error: errUpdate } = await supabase
+      .from('estacionamientos')
+      .update({ occupied_spots: parking.occupied_spots + 1 })
+      .eq('id', parking_id);
+
+    if (errUpdate) {
+      // Si falla la actualización, idealmente se ejecuta una compensación (borrar la reserva)
+      await supabase.from('reservas').delete().eq('id', reserva.id);
+      throw new Error('Fallo al actualizar ocupación. Reserva revertida por seguridad.');
+    }
+
+    return NextResponse.json({ success: true, data: reserva, message: 'Saga completada con éxito.' }, { status: 201, headers: CORS_HEADERS });
   } catch (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500, headers: CORS_HEADERS });
   }

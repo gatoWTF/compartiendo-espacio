@@ -6,7 +6,7 @@ import { supabase } from '@parkings/supabase-db';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_WEB_URL || '*',
-  'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, DELETE, PATCH, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
@@ -91,6 +91,34 @@ export async function DELETE(request) {
     if (error) throw error;
 
     return NextResponse.json({ success: true, deleted: ids.length }, { status: 200, headers: CORS_HEADERS });
+  } catch (error) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500, headers: CORS_HEADERS });
+  }
+}
+
+// PATCH: Actualizar ocupación (CQRS Liviano / Host Dashboard)
+export async function PATCH(request) {
+  try {
+    const body = await request.json();
+    const { id, occupied_spots } = body;
+
+    if (!id || occupied_spots === undefined) {
+      return NextResponse.json(
+        { success: false, error: 'Se requiere id y occupied_spots.' },
+        { status: 400, headers: CORS_HEADERS }
+      );
+    }
+
+    const { data, error } = await supabase
+      .from('estacionamientos')
+      .update({ occupied_spots })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return NextResponse.json({ success: true, data }, { status: 200, headers: CORS_HEADERS });
   } catch (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500, headers: CORS_HEADERS });
   }
