@@ -17,15 +17,15 @@ const nextConfig = {
     return [
       {
         source: '/api/auth/:path*',
-        destination: `${authUrl}/api/v1/auth/:path*`,
+        destination: `${authUrl}/auth/:path*`,
       },
       {
         source: '/api/mapas/:path*',
-        destination: `${mapasUrl}/api/v1/search/:path*`,
+        destination: `${mapasUrl}/search/:path*`,
       },
       {
         source: '/api/reservas/:path*',
-        destination: `${reservasUrl}/api/v1/reserve/:path*`,
+        destination: `${reservasUrl}/reserve/:path*`,
       },
     ];
   },
