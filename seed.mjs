@@ -16,7 +16,7 @@ async function seed() {
   console.log("Creando cuentas de prueba en Supabase...");
 
   const testAccounts = [
-    { email: 'anfitrion@test.com', password: 'password123', no  mbre: 'Arrendador Test' },
+    { email: 'anfitrion@test.com', password: 'password123', nombre: 'Arrendador Test' },
     { email: 'usuario@test.com', password: 'password123', nombre: 'Conductor Test' }
   ];
 

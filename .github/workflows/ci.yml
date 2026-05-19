@@ -1,0 +1,41 @@
+name: CI Pipeline - Parking's Together (Enterprise)
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build-and-test:
+    name: Build, Lint & Test (Quality Gate)
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js 18.x
+      uses: actions/setup-node@v4
+      with:
+        node-version: 18.x
+        cache: 'npm'
+
+    - name: Install Monorepo Dependencies
+      run: npm ci
+
+    - name: Run Turborepo Linter
+      run: npx turbo run lint
+
+    - name: Run Unit Tests (Circuit Breaker & Saga Mocks)
+      run: npx jest --passWithNoTests
+      
+    - name: Build Turborepo (Dry Run para Vercel)
+      run: npx turbo run build
+      env:
+        NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+
+    - name: Success Notification
+      if: success()
+      run: echo "🚀 Pipeline Passed! Quality Gate cleared. Ready for Vercel."
