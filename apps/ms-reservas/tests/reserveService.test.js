@@ -1,8 +1,15 @@
 import { ReserveService } from '../src/services/reserve.service';
 import { ReserveRepository } from '../src/repositories/reserve.repository';
 
-// Mockear el repositorio para NO tocar Supabase Real
-jest.mock('../src/repositories/reserve.repository');
+// Mockear el repositorio con factory function para evitar que Jest cargue Supabase y arroje error de WebSockets
+jest.mock('../src/repositories/reserve.repository', () => ({
+  ReserveRepository: {
+    getParkingAvailability: jest.fn(),
+    createReserve: jest.fn(),
+    updateParkingOccupancy: jest.fn(),
+    deleteReserve: jest.fn()
+  }
+}));
 
 describe('Domain-Driven Design: Saga de Reservas', () => {
   beforeEach(() => {
