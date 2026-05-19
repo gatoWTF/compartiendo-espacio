@@ -24,8 +24,11 @@ jobs:
     - name: Install Monorepo Dependencies
       run: npm ci
 
-    - name: Run Unit Tests (Circuit Breaker & Saga Mocks)
-      run: npx jest --passWithNoTests
+    - name: Run Unit Tests (Circuit Breaker)
+      run: cd apps/web && npx jest --passWithNoTests
+
+    - name: Run Unit Tests (Saga Mocks)
+      run: cd apps/ms-reservas && npx jest --passWithNoTests
       
     - name: Build Turborepo (Dry Run para Vercel)
       run: npx turbo run build
