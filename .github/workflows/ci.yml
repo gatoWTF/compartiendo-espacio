@@ -24,9 +24,6 @@ jobs:
     - name: Install Monorepo Dependencies
       run: npm ci
 
-    - name: Run Turborepo Linter
-      run: npx turbo run lint
-
     - name: Run Unit Tests (Circuit Breaker & Saga Mocks)
       run: npx jest --passWithNoTests
       

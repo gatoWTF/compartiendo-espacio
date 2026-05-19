@@ -1,6 +1,6 @@
 // Archivo: apps/ms-reservas/app/api/v1/reserve/route.js
 import { NextResponse } from 'next/server';
-import { ReserveController } from '../../../../../src/controllers/reserve.controller';
+import { ReserveController } from '../../../../src/controllers/reserve.controller';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_WEB_URL || '*',

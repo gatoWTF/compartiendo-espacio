@@ -1,6 +1,6 @@
 // Archivo: apps/auth/app/api/v1/auth/register/route.js
 import { NextResponse } from 'next/server';
-import { AuthController } from '../../../../../../src/controllers/auth.controller';
+import { AuthController } from '../../../../../src/controllers/auth.controller';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_WEB_URL || '*',

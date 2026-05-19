@@ -1,6 +1,6 @@
 // Archivo: apps/ms-mapas/app/api/v1/search/route.js
 import { NextResponse } from 'next/server';
-import { MapController } from '../../../../../src/controllers/map.controller';
+import { MapController } from '../../../../src/controllers/map.controller';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_WEB_URL || '*',
