@@ -33,8 +33,8 @@ jobs:
     - name: Build Turborepo (Dry Run para Vercel)
       run: npx turbo run build
       env:
-        NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        NEXT_PUBLIC_SUPABASE_URL: "http://mock-supabase.local"
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: "mock-anon-key-12345"
 
     - name: Success Notification
       if: success()
