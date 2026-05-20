@@ -1,8 +1,17 @@
 'use client';
 import { useMapRadar } from '../../src/hooks/useMapRadar';
-import { MapPresenter } from '../../src/components/map/MapPresenter';
+import Map from '../../src/components/Map';
 
 export default function MapaPageContainer() {
   const { state, actions } = useMapRadar();
-  return <MapPresenter state={state} actions={actions} />;
+  
+  return (
+    <Map 
+      location={state.userLoc} 
+      isLoading={state.loading} 
+      error={state.reserveError} 
+      parkings={state.parkings} 
+      onSpotSelect={actions.setSelectedSpot} 
+    />
+  );
 }
