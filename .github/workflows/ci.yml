@@ -29,12 +29,16 @@ jobs:
       env:
         NEXT_PUBLIC_SUPABASE_URL: "http://mock-supabase.local"
         NEXT_PUBLIC_SUPABASE_ANON_KEY: "mock-anon-key-12345"
+        SUPABASE_URL: "http://mock-supabase.local"
+        SUPABASE_SERVICE_ROLE_KEY: "mock-service-key-12345"
       
     - name: Build Turborepo (Dry Run para Vercel)
       run: npx turbo run build
       env:
         NEXT_PUBLIC_SUPABASE_URL: "http://mock-supabase.local"
         NEXT_PUBLIC_SUPABASE_ANON_KEY: "mock-anon-key-12345"
+        SUPABASE_URL: "http://mock-supabase.local"
+        SUPABASE_SERVICE_ROLE_KEY: "mock-service-key-12345"
 
     - name: Success Notification
       if: success()
