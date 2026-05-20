@@ -1,6 +1,8 @@
 'use client';
 import { useMapRadar } from '../../src/hooks/useMapRadar';
-import Map from '../../src/components/Map';
+import dynamic from 'next/dynamic';
+
+const Map = dynamic(() => import('../../src/components/Map'), { ssr: false });
 
 export default function MapaPageContainer() {
   const { state, actions } = useMapRadar();
