@@ -1,8 +1,8 @@
-import { ReserveService } from '../src/services/reserve.service';
-import { ReserveRepository } from '../src/repositories/reserve.repository';
+import { ReserveService } from '../app/api/v1/reserve/services/reserva.service';
+import { ReserveRepository } from '../app/api/v1/reserve/repositories/reserva.repository';
 
 // Mockear el repositorio con factory function para evitar que Jest cargue Supabase y arroje error de WebSockets
-jest.mock('../src/repositories/reserve.repository', () => ({
+jest.mock('../app/api/v1/reserve/repositories/reserva.repository', () => ({
   ReserveRepository: {
     getParkingAvailability: jest.fn(),
     createReserve: jest.fn(),

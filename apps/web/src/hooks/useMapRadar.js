@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { api } from '../lib/api';
 import { useRouter } from 'next/navigation';
+import { useGeolocation } from './useGeolocation';
 
 export function useMapRadar() {
-  const [userLoc, setUserLoc] = useState({ lat: -33.3601, lng: -70.6925 }); 
+  const { location: userLoc, isLoading: isLocating, error: locError } = useGeolocation();
   const [parkings, setParkings] = useState([]);
   const [radius, setRadius] = useState(5);
   const [sortOption, setSortOption] = useState('cercania');
@@ -30,15 +31,6 @@ export function useMapRadar() {
       return data.success ? data.data : [];
     } catch (e) { return []; }
   };
-
-  useEffect(() => {
-    if (typeof navigator !== 'undefined' && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        () => console.log("Usando Plaza Norte por defecto")
-      );
-    }
-  }, []);
 
   const loadParkings = async () => {
     setLoading(true);

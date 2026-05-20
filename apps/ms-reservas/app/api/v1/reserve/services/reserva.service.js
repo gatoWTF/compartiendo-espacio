@@ -1,4 +1,4 @@
-import { ReserveRepository } from '../repositories/reserve.repository';
+import { ReserveRepository } from '../repositories/reserva.repository';
 
 export const ReserveService = {
   async processSaga(payload) {
