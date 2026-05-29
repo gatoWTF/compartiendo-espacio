@@ -24,10 +24,10 @@ export default function AuthPage() {
     setLoading(true);
     setError(null);
 
-    // Validación simplificada de contraseña (solo letras y números, mín 6)
-    const passRegex = /^[a-zA-Z0-9]{6,}$/;
+    // Validación de contraseña segura para coincidir con Supabase
+    const passRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]).{8,}$/;
     if (!passRegex.test(formData.password)) {
-      setError("Contraseña inválida: Solo se permiten letras y números (mínimo 6 caracteres).");
+      setError("Contraseña inválida: Mínimo 8 caracteres, incluye mayúscula, minúscula, número y símbolo.");
       setLoading(false);
       return;
     }
