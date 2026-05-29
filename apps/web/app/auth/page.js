@@ -33,16 +33,16 @@ export default function AuthPage() {
     }
 
     try {
-      const URL_AUTH = process.env.NEXT_PUBLIC_MS_AUTH_URL || 'http://localhost:3001/api/v1';
+      const URL_AUTH = process.env.NEXT_PUBLIC_AUTH_URL || 'http://localhost:3001/api/v1';
       const endpoint = isLogin ? '/auth/login' : '/auth/register';
-      
+
       const res = await fetch(`${URL_AUTH}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
       });
       const result = await res.json();
-      
+
       if (!result.success) throw new Error(result.error);
 
       setSuccessAnim(true); // Activa la animación de éxito
@@ -60,8 +60,8 @@ export default function AuthPage() {
         }
       }, 1500);
 
-    } catch (err) { 
-      setError(err.message); 
+    } catch (err) {
+      setError(err.message);
       setLoading(false);
     }
   };
@@ -89,7 +89,7 @@ export default function AuthPage() {
         {!successAnim ? (
           <>
             <div className="brand-logo">
-               <i className={isLogin ? "fa-solid fa-fingerprint" : "fa-solid fa-satellite-dish"}></i>
+              <i className={isLogin ? "fa-solid fa-fingerprint" : "fa-solid fa-satellite-dish"}></i>
             </div>
             <h2>{isLogin ? 'Acceso Seguro' : 'Registro en la Red'}</h2>
             <p className="auth-subtitle">P2P DISTRIBUIDO - COMPARTIENDO ESPACIO</p>
@@ -104,21 +104,21 @@ export default function AuthPage() {
               <div className={`form-step ${!isLogin ? 'expanded' : 'collapsed'}`}>
                 <div className="input-wrap">
                   <i className="fa-solid fa-user icon"></i>
-                  <input type="text" placeholder="Tu nombre completo" required={!isLogin} value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} />
+                  <input type="text" placeholder="Tu nombre completo" required={!isLogin} value={formData.nombre} onChange={e => setFormData({ ...formData, nombre: e.target.value })} />
                 </div>
               </div>
 
               <div className="input-wrap">
                 <i className="fa-solid fa-envelope icon"></i>
-                <input type="email" placeholder="Correo electrónico" required value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+                <input type="email" placeholder="Correo electrónico" required value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
               </div>
 
               <div className="input-wrap tooltip-container">
                 <i className="fa-solid fa-lock icon"></i>
-                <input type="password" placeholder="Contraseña (letras y números)" required value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
+                <input type="password" placeholder="Contraseña (letras y números)" required value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} />
                 <span className="tooltip-text">Solo letras y números, mín 6 caracteres.</span>
               </div>
-              
+
               <button type="submit" className="auth-btn-main" disabled={loading}>
                 {loading ? (
                   <span className="btn-content"><i className="fa-solid fa-spinner fa-spin"></i> SINCRONIZANDO...</span>
