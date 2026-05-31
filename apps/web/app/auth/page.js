@@ -50,12 +50,16 @@ export default function AuthPage() {
 
         // Recuperar el rol del perfil
         if (authData?.user) {
-          const { data: profile } = await supabase.from('perfiles').select('rol').eq('id', authData.user.id).single();
+          let profile = null;
+          try {
+            const { data: profileData } = await supabase.from('perfiles').select('rol').eq('id', authData.user.id).single();
+            profile = profileData;
+          } catch (e) { /* tabla puede no existir aún */ }
           const userObj = {
             id: authData.user.id,
             email: authData.user.email,
             nombre: authData.user.user_metadata?.nombre || authData.user.email?.split('@')[0],
-            rol: profile?.rol || 'cliente'
+            rol: profile?.rol || authData.user.user_metadata?.rol || 'cliente'
           };
           window.localStorage.setItem('user', JSON.stringify(userObj));
         }
@@ -95,9 +99,7 @@ export default function AuthPage() {
         toast.success("¡Cuenta creada exitosamente!");
         
         setTimeout(() => {
-          setIsLogin(true);
-          setSuccessAnim(false);
-          reset();
+          router.push('/mapa');
         }, 1500);
       }
     } catch (err) {

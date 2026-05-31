@@ -10,6 +10,8 @@ export default function ProfilePage() {
   const [vehiculos, setVehiculos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [nuevoEmail, setNuevoEmail] = useState('');
   const [activeTab, setActiveTab] = useState('personales'); // personales, vehiculos, pmr
   
   const [nuevoVehiculo, setNuevoVehiculo] = useState({ placa: '', modelo: '', color: '' });
@@ -130,6 +132,42 @@ export default function ProfilePage() {
     }
   };
 
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${session.user.id}/avatar.${fileExt}`;
+      const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file, { upsert: true });
+      if (uploadError) throw uploadError;
+      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
+      const avatarUrl = `${publicUrl}?t=${Date.now()}`;
+      const { error: updateError } = await supabase.from('perfiles').upsert({ id: session.user.id, avatar_url: avatarUrl });
+      if (updateError) throw updateError;
+      setPerfil({ ...perfil, avatar_url: avatarUrl });
+      toast.success('Avatar actualizado');
+    } catch (error) {
+      toast.error(error.message || 'Error al subir avatar');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleUpdateEmail = async () => {
+    if (!nuevoEmail || nuevoEmail === session?.user?.email) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ email: nuevoEmail });
+      if (error) throw error;
+      toast.success('Se envió un correo de confirmación al nuevo email');
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push('/auth');
@@ -155,12 +193,16 @@ export default function ProfilePage() {
         
         {/* Sidebar / User Info */}
         <div className="profile-sidebar">
-          <div className="avatar-ring">
-            {perfil.avatar_url ? (
+          <div className="avatar-ring" onClick={() => document.getElementById('avatar-input').click()} style={{cursor:'pointer'}} title="Cambiar foto de perfil">
+            {uploading ? (
+               <i className="fa-solid fa-spinner fa-spin"></i>
+            ) : perfil.avatar_url ? (
                <img src={perfil.avatar_url} alt="Avatar" className="avatar-img" />
             ) : (
                <i className="fa-solid fa-user-astronaut"></i>
             )}
+            <div className="avatar-overlay"><i className="fa-solid fa-camera"></i></div>
+            <input id="avatar-input" type="file" accept="image/png,image/jpeg,image/webp" onChange={handleAvatarUpload} style={{display:'none'}} />
           </div>
           <h1>{perfil.nombre || 'Operador de Red'}</h1>
           <p className="email-tag">{session?.user?.email}</p>
@@ -234,13 +276,6 @@ export default function ProfilePage() {
                     <span className="info-value">{session?.user?.created_at ? new Date(session.user.created_at).toLocaleDateString('es-CL', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A'}</span>
                   </div>
                 </div>
-                <div className="info-card">
-                  <div className="info-card-icon id"><i className="fa-solid fa-fingerprint"></i></div>
-                  <div className="info-card-data">
-                    <span className="info-label">NODE ID</span>
-                    <span className="info-value mono">{session?.user?.id?.substring(0, 12)}...</span>
-                  </div>
-                </div>
               </div>
 
               <h3 style={{color: '#94a3b8', fontSize: '0.85rem', fontWeight: 700, letterSpacing: '1px', marginTop: '35px', marginBottom: '5px'}}>EDITAR DATOS PERSONALES</h3>
@@ -253,16 +288,22 @@ export default function ProfilePage() {
                   <label>Teléfono de Contacto</label>
                   <input type="tel" placeholder="+56 9 1234 5678" value={perfil.telefono} onChange={e => setPerfil({...perfil, telefono: e.target.value})} />
                 </div>
-                {/* En el futuro: Input File para Avatar conectado a Supabase Storage */}
-                <div className="input-wrap">
-                  <label>URL de Avatar (Opcional)</label>
-                  <input type="url" placeholder="https://..." value={perfil.avatar_url} onChange={e => setPerfil({...perfil, avatar_url: e.target.value})} />
-                </div>
                 
                 <button type="submit" className="btn-cyber-primary" disabled={saving}>
                   {saving ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-floppy-disk"></i>} Guardar Cambios
                 </button>
               </form>
+
+              <h3 style={{color: '#94a3b8', fontSize: '0.85rem', fontWeight: 700, letterSpacing: '1px', marginTop: '35px', marginBottom: '5px'}}>CAMBIAR CORREO ELECTRÓNICO</h3>
+              <div className="cyber-form" style={{maxWidth: '500px', marginTop: '15px'}}>
+                <div className="input-wrap">
+                  <label>Nuevo Correo Electrónico</label>
+                  <input type="email" placeholder={session?.user?.email} value={nuevoEmail} onChange={e => setNuevoEmail(e.target.value)} />
+                </div>
+                <button type="button" className="btn-cyber-secondary" onClick={handleUpdateEmail} disabled={saving || !nuevoEmail} style={{marginTop:'10px'}}>
+                  <i className="fa-solid fa-envelope"></i> Actualizar Email
+                </button>
+              </div>
             </div>
           )}
 
@@ -340,6 +381,9 @@ export default function ProfilePage() {
         .profile-sidebar { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(20px); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 24px; padding: 40px 20px; display: flex; flex-direction: column; align-items: center; text-align: center; height: calc(100vh - 140px); position: sticky; top: 100px; }
         .avatar-ring { width: 100px; height: 100px; margin: 0 auto 20px; background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(16, 185, 129, 0.1)); border: 2px solid #3b82f6; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; color: #60a5fa; box-shadow: 0 0 30px rgba(59, 130, 246, 0.3); overflow: hidden; }
         .avatar-img { width: 100%; height: 100%; object-fit: cover; }
+        .avatar-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; border-radius: 50%; opacity: 0; transition: opacity 0.3s; font-size: 1.2rem; color: white; }
+        .avatar-ring:hover .avatar-overlay { opacity: 1; }
+        .avatar-ring { position: relative; }
         .profile-sidebar h1 { color: white; font-size: 1.5rem; font-weight: 900; margin-bottom: 5px; }
         .email-tag { color: #94a3b8; font-size: 0.9rem; margin-bottom: 20px; }
         .status-badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); color: #10b981; border-radius: 20px; font-size: 0.75rem; font-weight: 900; letter-spacing: 1px; margin-bottom: 40px; }

@@ -53,14 +53,20 @@ export default function DashboardPage() {
         return;
       }
 
-      // Fetch the user's rol from the database
-      const { data: profile } = await supabase.from('perfiles').select('rol, nombre').eq('id', authSession.user.id).single();
+      // Fetch the user's rol from the database (resilient)
+      let profile = null;
+      try {
+        const { data: profileData } = await supabase.from('perfiles').select('rol, nombre').eq('id', authSession.user.id).single();
+        profile = profileData;
+      } catch (e) {
+        console.warn('[Dashboard] Perfil no disponible, usando fallback de auth metadata');
+      }
       
       const userObj = {
         id: authSession.user.id,
         email: authSession.user.email,
         nombre: profile?.nombre || authSession.user.user_metadata?.nombre || authSession.user.email?.split('@')[0],
-        rol: profile?.rol || 'cliente'
+        rol: profile?.rol || authSession.user.user_metadata?.rol || 'cliente'
       };
 
       setSession({ user: userObj, access_token: authSession.access_token });
