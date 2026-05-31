@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -14,7 +14,19 @@ export default function Map({
   userProfile
 }) {
   const mapRef = useRef(null);
+  const [userName, setUserName] = useState(null);
+  const [userMarker, setUserMarker] = useState(null);
 
+  // 1. Sincronizar el nombre del usuario de manera asíncrona e independiente
+  useEffect(() => {
+    if (userProfile && userProfile.name) {
+      setUserName(userProfile.name);
+    } else {
+      setUserName(null);
+    }
+  }, [userProfile]);
+
+  // 2. Inicialización del Mapa, Radar y Parkings
   useEffect(() => {
     if (isLoading || typeof window === 'undefined') return;
 
@@ -67,30 +79,6 @@ export default function Map({
     
     radarPulse.setLatLng([location.lat, location.lng]);
     radarPulse.setRadius(radius * 1000);
-
-    // Live Avatar Marker (User Tracking)
-    const userInitial = userProfile?.name?.charAt(0)?.toUpperCase() || "U";
-    const userLiveIcon = L.divIcon({
-      className: 'custom-user-pin',
-      html: `
-        <div class="user-live-marker">
-          ${userInitial}
-        </div>
-      `,
-      iconSize: [36, 36],
-      iconAnchor: [18, 18]
-    });
-
-    if (!window.__userLiveMarker) {
-      window.__userLiveMarker = L.marker([location.lat, location.lng], {
-        icon: userLiveIcon,
-        zIndexOffset: 1000
-      }).addTo(mapRef.current);
-    } else {
-      window.__userLiveMarker.setLatLng([location.lat, location.lng]);
-      // Set the icon on every render in case the profile finished loading (changes from 'U' to Initial)
-      window.__userLiveMarker.setIcon(userLiveIcon);
-    }
 
     // Limpiar pines anteriores
     markerLayer.clearLayers();
@@ -164,7 +152,40 @@ export default function Map({
     });
 
     return () => {}; // Evitamos limpieza total en unmount
-  }, [location, isLoading, parkings, onSpotSelect, radius, filters, userProfile]);
+  }, [location, isLoading, parkings, onSpotSelect, radius, filters]);
+
+  // 3. Reactividad estricta del Live Avatar Marker
+  useEffect(() => {
+    if (!mapRef.current || !location) return;
+
+    // Estado del avatar
+    const isReady = userName !== null;
+    const userInitial = isReady ? userName.charAt(0).toUpperCase() : "...";
+
+    const userLiveIcon = L.divIcon({
+      className: 'custom-user-pin',
+      html: `
+        <div class="user-live-marker ${!isReady ? 'loading-avatar' : ''}">
+          ${userInitial}
+        </div>
+      `,
+      iconSize: [36, 36],
+      iconAnchor: [18, 18]
+    });
+
+    if (!userMarker) {
+      // Crear marcador por primera vez
+      const newMarker = L.marker([location.lat, location.lng], {
+        icon: userLiveIcon,
+        zIndexOffset: 1000
+      }).addTo(mapRef.current);
+      setUserMarker(newMarker);
+    } else {
+      // Reconstruir visualmente y mover si ya existe
+      userMarker.setLatLng([location.lat, location.lng]);
+      userMarker.setIcon(userLiveIcon);
+    }
+  }, [location, userName, mapRef.current]);
 
   if (error) return (
     <div className="flex h-full w-full items-center justify-center bg-[#0f172a]">
@@ -212,6 +233,16 @@ export default function Map({
           text-transform: uppercase;
           animation: livePulse 2s infinite;
           box-shadow: 0 4px 6px -1px rgba(0,0,0,.5);
+        }
+
+        .loading-avatar {
+          opacity: 0.5;
+          animation: text-pulse 1.5s infinite ease-in-out;
+        }
+
+        @keyframes text-pulse {
+          0%, 100% { opacity: 0.4; }
+          50% { opacity: 0.8; }
         }
 
         /* Sistema de Semáforo de Pines */

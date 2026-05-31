@@ -8,23 +8,41 @@ export function useGeolocation() {
   const [userProfile, setUserProfile] = useState(null);
 
   useEffect(() => {
-    // 1. Cargar el perfil de manera no bloqueante (manejo robusto de errores)
-    // Esto garantiza que un 404 en la base de datos no rompa la inicialización del mapa.
     const loadProfile = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
+        if (!session) return;
+
+        let resolvedName = null;
+
+        // Primer intento: perfiles.nombre
+        try {
           const { data: profile, error: profileError } = await supabase
             .from('perfiles')
             .select('nombre')
             .eq('id', session.user.id)
             .single();
           
-          if (profileError) throw profileError;
-          setUserProfile({ name: profile.nombre });
+          if (!profileError && profile?.nombre) {
+            resolvedName = profile.nombre;
+          }
+        } catch (e) {
+          console.warn('[Geolocation] Fallo al consultar tabla perfiles, usando fallback');
         }
+
+        // Fallbacks automáticos si la tabla falló o devolvió 404
+        if (!resolvedName) {
+          resolvedName = 
+            session.user.user_metadata?.nombre || 
+            session.user.user_metadata?.full_name || 
+            session.user.email?.split('@')[0] || 
+            'Usuario';
+        }
+
+        setUserProfile({ name: resolvedName, session });
+
       } catch (err) {
-        console.error('[Geolocation] Fallo silencioso al cargar perfil de Supabase:', err.message);
+        console.error('[Geolocation] Fallo silencioso al cargar sesión de Supabase:', err.message);
         setUserProfile(null);
       }
     };
