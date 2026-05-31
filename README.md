@@ -3,7 +3,7 @@
 
 **Optimización de Movilidad Urbana y Gestión Inteligente de Estacionamientos**
 
-"Compartiendo Espacio" es una plataforma tecnológica diseñada para revolucionar la forma en que los conductores encuentran estacionamiento en áreas metropolitanas. A través de un sistema en tiempo real basado en geolocalización, la aplicación reduce la congestión vehicular, fomenta la inclusión y abre la puerta a un modelo de economía colaborativa (Peer-to-Peer).
+Es una plataforma tecnológica diseñada para revolucionar la forma en que los conductores encuentran estacionamiento en áreas metropolitanas. A través de un sistema en tiempo real basado en geolocalización, la aplicación reduce la congestión vehicular, fomenta la inclusión y abre la puerta a un modelo de economía colaborativa (Peer-to-Peer).
 
 ---
 
