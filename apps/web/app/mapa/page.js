@@ -123,6 +123,7 @@ export default function MapaPageContainer() {
           onSpotSelect={actions.setSelectedSpot}
           radius={localRadius}
           filters={filters}
+          userProfile={state.userProfile}
         />
       </div>
 

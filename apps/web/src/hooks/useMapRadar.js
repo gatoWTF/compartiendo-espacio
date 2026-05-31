@@ -5,7 +5,7 @@ import { useGeolocation } from './useGeolocation';
 import { supabase } from '@parkings/supabase-db';
 
 export function useMapRadar() {
-  const { location: userLoc, isLoading: isLocating, error: locError } = useGeolocation();
+  const { location: userLoc, isLoading: isLocating, error: locError, userProfile } = useGeolocation();
   const [parkings, setParkings] = useState([]);
   const [radius, setRadius] = useState(5);
   const [sortOption, setSortOption] = useState('cercania');
@@ -125,7 +125,7 @@ export function useMapRadar() {
   };
 
   return {
-    state: { userLoc, parkings, radius, sortOption, selectedSpot, loading, isCloud, mobileMenuOpen, isReserving, reserveStep, reserveError },
+    state: { userLoc, parkings, radius, sortOption, selectedSpot, loading, isCloud, mobileMenuOpen, isReserving, reserveStep, reserveError, userProfile },
     actions: { setRadius, setSortOption, setSelectedSpot, setMobileMenuOpen, handleReserve }
   };
 }

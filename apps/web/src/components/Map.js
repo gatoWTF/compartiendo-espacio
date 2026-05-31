@@ -10,7 +10,8 @@ export default function Map({
   parkings = [], 
   onSpotSelect,
   radius = 5, // In km
-  filters = { p2p: false, pmr: false }
+  filters = { p2p: false, pmr: false },
+  userProfile
 }) {
   const mapRef = useRef(null);
 
@@ -66,6 +67,30 @@ export default function Map({
     
     radarPulse.setLatLng([location.lat, location.lng]);
     radarPulse.setRadius(radius * 1000);
+
+    // Live Avatar Marker (User Tracking)
+    const userInitial = userProfile?.name?.charAt(0)?.toUpperCase() || "U";
+    const userLiveIcon = L.divIcon({
+      className: 'custom-user-pin',
+      html: `
+        <div class="user-live-marker">
+          ${userInitial}
+        </div>
+      `,
+      iconSize: [36, 36],
+      iconAnchor: [18, 18]
+    });
+
+    if (!window.__userLiveMarker) {
+      window.__userLiveMarker = L.marker([location.lat, location.lng], {
+        icon: userLiveIcon,
+        zIndexOffset: 1000
+      }).addTo(mapRef.current);
+    } else {
+      window.__userLiveMarker.setLatLng([location.lat, location.lng]);
+      // Set the icon on every render in case the profile finished loading (changes from 'U' to Initial)
+      window.__userLiveMarker.setIcon(userLiveIcon);
+    }
 
     // Limpiar pines anteriores
     markerLayer.clearLayers();
@@ -139,7 +164,7 @@ export default function Map({
     });
 
     return () => {}; // Evitamos limpieza total en unmount
-  }, [location, isLoading, parkings, onSpotSelect, radius, filters]);
+  }, [location, isLoading, parkings, onSpotSelect, radius, filters, userProfile]);
 
   if (error) return (
     <div className="flex h-full w-full items-center justify-center bg-[#0f172a]">
@@ -162,6 +187,31 @@ export default function Map({
         @keyframes radarPulse {
           0% { transform: scale(0.5); fill-opacity: 0.6; }
           100% { transform: scale(1.15); fill-opacity: 0; }
+        }
+
+        /* Live Avatar Marker */
+        @keyframes livePulse {
+          0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+          70% { box-shadow: 0 0 0 20px rgba(59, 130, 246, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+
+        .user-live-marker {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          width: 36px !important;
+          height: 36px !important;
+          background: rgba(15, 23, 42, 0.8);
+          backdrop-filter: blur(4px);
+          border: 2px solid #3B82F6;
+          border-radius: 9999px;
+          color: white;
+          font-size: 16px;
+          font-weight: 700;
+          text-transform: uppercase;
+          animation: livePulse 2s infinite;
+          box-shadow: 0 4px 6px -1px rgba(0,0,0,.5);
         }
 
         /* Sistema de Semáforo de Pines */
