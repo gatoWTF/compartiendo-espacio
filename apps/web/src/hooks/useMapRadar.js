@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { api } from '../lib/api';
 import { useRouter } from 'next/navigation';
 import { useGeolocation } from './useGeolocation';
+import { supabase } from '@parkings/supabase-db';
 
 export function useMapRadar() {
   const { location: userLoc, isLoading: isLocating, error: locError } = useGeolocation();
@@ -42,16 +43,45 @@ export function useMapRadar() {
 
   useEffect(() => {
     loadParkings();
+
+    // ─── WEBSOCKETS REALTIME SUBSCRIPTION ───
+    const channel = supabase
+      .channel('public:estacionamientos')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'estacionamientos' },
+        (payload) => {
+          if (payload.eventType === 'UPDATE') {
+            setParkings((current) =>
+              current.map((p) => (p.id === payload.new.id ? { ...p, ...payload.new } : p))
+            );
+            // Actualizar spot seleccionado si es el modificado
+            setSelectedSpot((current) => 
+              current?.id === payload.new.id ? { ...current, ...payload.new } : current
+            );
+          } else if (payload.eventType === 'INSERT') {
+            setParkings((current) => [...current, payload.new]);
+          } else if (payload.eventType === 'DELETE') {
+            setParkings((current) => current.filter((p) => p.id !== payload.old.id));
+            setSelectedSpot((current) => current?.id === payload.old.id ? null : current);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [radius, userLoc]);
 
   const handleReserve = async () => {
-    const userStr = window.localStorage.getItem('user');
-    if (!userStr) {
+    // Use Supabase session instead of localStorage
+    const { data: { session: authSession } } = await supabase.auth.getSession();
+    if (!authSession?.user) {
       router.push('/auth');
       return;
     }
-    const user = JSON.parse(userStr);
 
     setIsReserving(true);
     setReserveError(null);
@@ -68,7 +98,7 @@ export function useMapRadar() {
 
       const resData = await api.reservas.crearReserva({
         parking_id: selectedSpot.id,
-        user_id: user.id,
+        user_id: authSession.user.id,
         duration_hours: 1
       });
 

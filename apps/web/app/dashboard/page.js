@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { api } from '../../src/lib/api';
+import { supabase } from '@parkings/supabase-db';
 
-const MiniMapComponent = dynamic(() => import('../../components/MiniMap'), {
+const MiniMapComponent = dynamic(() => import('../../src/components/MiniMap'), {
   ssr: false,
   loading: () => (
     <div style={{ height: '350px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.2)', borderRadius: '12px' }}>
@@ -44,19 +45,28 @@ export default function DashboardPage() {
     }
 
     const checkUserAndFetchData = async () => {
-      const userStr = window.localStorage.getItem('user');
-      const token   = window.localStorage.getItem('access_token');
-
-      if (!userStr || !token) {
+      // Use Supabase session instead of manually checking localStorage
+      const { data: { session: authSession } } = await supabase.auth.getSession();
+      
+      if (!authSession?.user) {
         router.push('/auth');
         return;
       }
 
-      const user = JSON.parse(userStr);
-      setSession({ user, access_token: token });
+      // Fetch the user's rol from the database
+      const { data: profile } = await supabase.from('perfiles').select('rol, nombre').eq('id', authSession.user.id).single();
+      
+      const userObj = {
+        id: authSession.user.id,
+        email: authSession.user.email,
+        nombre: profile?.nombre || authSession.user.user_metadata?.nombre || authSession.user.email?.split('@')[0],
+        rol: profile?.rol || 'cliente'
+      };
+
+      setSession({ user: userObj, access_token: authSession.access_token });
 
       try {
-        const result = await api.mapas.getMisEstacionamientos(user.id);
+        const result = await api.mapas.getMisEstacionamientos(userObj.id);
         if (result.success) setMyParkings(result.data || []);
       } catch (e) {
         console.error('Error cargando estacionamientos:', e);
@@ -144,10 +154,15 @@ export default function DashboardPage() {
       ? setSelectedIds([])
       : setSelectedIds(myParkings.map(p => p.id));
 
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+
   const handleBulkDelete = async () => {
     if (selectedIds.length === 0) return;
-    if (!window.confirm(`¿Seguro de ELIMINAR ${selectedIds.length} estacionamiento(s) de la base de datos?`)) return;
+    setShowConfirmModal(true);
+  };
 
+  const executeBulkDelete = async () => {
+    setShowConfirmModal(false);
     showToast('Borrando de Supabase Cloud...', 'syncing');
 
     try {
@@ -199,55 +214,114 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="dashboard-grid">
-        {/* FORMULARIO NUEVO ESPACIO */}
-        <div className="glass-panel form-panel">
-          <h3><i className="fa-solid fa-satellite-dish"></i> Desplegar Nuevo Nodo</h3>
-          <p className="panel-desc">Añade tu espacio a la red descentralizada de estacionamientos.</p>
-          
-          <form onSubmit={handleCreate} className="create-form">
-            <div className="input-row">
-              <div className="input-group search-group">
-                <i className="fa-solid fa-map-pin icon"></i>
-                <input type="text" placeholder="Ej: Avenida Falsa 123" value={direccion} onChange={e => setDireccion(e.target.value)} />
-                <button type="button" onClick={handleSearchAddress} className="btn-search">UBICAR</button>
-              </div>
+      {showConfirmModal && (
+        <div className="modal-overlay">
+          <div className="glass-panel modal-content">
+            <h3><i className="fa-solid fa-triangle-exclamation" style={{color: '#ef4444'}}></i> Confirmar Eliminación</h3>
+            <p>¿Estás seguro de que deseas eliminar {selectedIds.length} estacionamiento(s) de la red?</p>
+            <div className="modal-actions">
+              <button onClick={() => setShowConfirmModal(false)} className="btn-cancel">Cancelar</button>
+              <button onClick={executeBulkDelete} className="btn-delete-bulk">Eliminar</button>
             </div>
-            
-            <div className="map-container">
-              <MiniMapComponent lat={lat} lng={lng} setLat={setLat} setLng={setLng} />
-            </div>
-            
-            <div className="input-row responsive-row">
-              <div className="input-group">
-                <i className="fa-solid fa-signature icon"></i>
-                <input type="text" placeholder="Nombre de la Plaza" value={nombre} onChange={e => setNombre(e.target.value)} required />
-              </div>
-              <div className="input-group small">
-                <i className="fa-solid fa-car icon"></i>
-                <input type="number" min="1" placeholder="Cupos" value={totalSpots} onChange={e => setTotalSpots(e.target.value)} required />
-              </div>
-            </div>
-            
-            <label className="checkbox-pmr">
-              <input type="checkbox" checked={esPmr} onChange={e => setEsPmr(e.target.checked)} />
-              <span>
-                <i className="fa-solid fa-wheelchair"></i>
-                Habilitar Zona Prioritaria PMR
-              </span>
-            </label>
-            
-            <button type="submit" className="btn-cyber-primary submit-btn">
-              <i className="fa-solid fa-cloud-arrow-up"></i> PUBLICAR EN SUPABASE
-            </button>
-          </form>
+          </div>
         </div>
+      )}
 
-        {/* INVENTARIO */}
+      <div className="dashboard-grid">
+        {/* KPI METRICS */}
+        {session?.user?.rol === 'anfitrion' && myParkings.length > 0 && (
+          <div className="kpi-row">
+            <div className="kpi-card">
+              <div className="kpi-icon blue"><i className="fa-solid fa-warehouse"></i></div>
+              <div className="kpi-data">
+                <span className="kpi-value">{myParkings.length}</span>
+                <span className="kpi-label">Nodos Activos</span>
+              </div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-icon green"><i className="fa-solid fa-car-side"></i></div>
+              <div className="kpi-data">
+                <span className="kpi-value">{myParkings.reduce((sum, p) => sum + p.total_spots, 0)}</span>
+                <span className="kpi-label">Cupos Totales</span>
+              </div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-icon amber"><i className="fa-solid fa-chart-pie"></i></div>
+              <div className="kpi-data">
+                <span className="kpi-value">
+                  {myParkings.reduce((sum, p) => sum + p.total_spots, 0) > 0 
+                    ? Math.round((myParkings.reduce((sum, p) => sum + (p.occupied_spots || 0), 0) / myParkings.reduce((sum, p) => sum + p.total_spots, 0)) * 100) 
+                    : 0}%
+                </span>
+                <span className="kpi-label">Tasa Ocupación</span>
+              </div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-icon purple"><i className="fa-solid fa-wheelchair"></i></div>
+              <div className="kpi-data">
+                <span className="kpi-value">{myParkings.filter(p => p.es_pmr).length}</span>
+                <span className="kpi-label">Zonas PMR</span>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* FORMULARIO NUEVO ESPACIO (Sólo Anfitriones) */}
+        {session?.user?.rol === 'anfitrion' && (
+          <div className="glass-panel form-panel">
+            <h3><i className="fa-solid fa-satellite-dish"></i> Desplegar Nuevo Nodo</h3>
+            <p className="panel-desc">Añade tu espacio a la red descentralizada de estacionamientos.</p>
+            
+            <form onSubmit={handleCreate} className="create-form">
+              <div className="input-row">
+                <div className="input-group search-group">
+                  <i className="fa-solid fa-map-pin icon"></i>
+                  <input type="text" placeholder="Ej: Avenida Falsa 123" value={direccion} onChange={e => setDireccion(e.target.value)} />
+                  <button type="button" onClick={handleSearchAddress} className="btn-search">UBICAR</button>
+                </div>
+              </div>
+              
+              <div className="map-container">
+                <MiniMapComponent lat={lat} lng={lng} setLat={setLat} setLng={setLng} />
+              </div>
+              
+              <div className="input-row responsive-row">
+                <div className="input-group">
+                  <i className="fa-solid fa-signature icon"></i>
+                  <input type="text" placeholder="Nombre de la Plaza" value={nombre} onChange={e => setNombre(e.target.value)} required />
+                </div>
+                <div className="input-group small">
+                  <i className="fa-solid fa-car icon"></i>
+                  <input type="number" min="1" placeholder="Cupos" value={totalSpots} onChange={e => setTotalSpots(e.target.value)} required />
+                </div>
+              </div>
+              
+              <label className="checkbox-pmr">
+                <input type="checkbox" checked={esPmr} onChange={e => setEsPmr(e.target.checked)} />
+                <span>
+                  <i className="fa-solid fa-wheelchair"></i>
+                  Habilitar Zona Prioritaria PMR
+                </span>
+              </label>
+              
+              <button type="submit" className="btn-cyber-primary submit-btn">
+                <i className="fa-solid fa-cloud-arrow-up"></i> PUBLICAR EN SUPABASE
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* INVENTARIO / MIS VEHICULOS */}
         <div className="inventory-panel">
           <div className="inventory-header">
-            <h3><i className="fa-solid fa-server"></i> Nodos Publicados ({myParkings.length})</h3>
-            {myParkings.length > 0 && (
+            <h3>
+              {session?.user?.rol === 'anfitrion' ? (
+                <><i className="fa-solid fa-server"></i> Nodos Publicados ({myParkings.length})</>
+              ) : (
+                <><i className="fa-solid fa-car"></i> Mis Vehículos ({myParkings.length})</>
+              )}
+            </h3>
+            {myParkings.length > 0 && session?.user?.rol === 'anfitrion' && (
               <div className="inventory-actions">
                 <button onClick={selectAll} className="btn-cyber-secondary action-btn">
                   {selectedIds.length === myParkings.length ? 'Desmarcar' : 'Seleccionar'}
@@ -263,8 +337,20 @@ export default function DashboardPage() {
 
           {myParkings.length === 0 ? (
             <div className="glass-panel empty-state">
-              <i className="fa-solid fa-network-wired"></i>
-              <p>Tu red está vacía. ¡Despliega tu primer nodo!</p>
+              {session?.user?.rol === 'anfitrion' ? (
+                <>
+                  <i className="fa-solid fa-network-wired"></i>
+                  <p>Tu red está vacía. ¡Despliega tu primer nodo!</p>
+                </>
+              ) : (
+                <>
+                  <i className="fa-solid fa-car-burst"></i>
+                  <p>Aún no has registrado vehículos ni reservas.</p>
+                  <button onClick={() => router.push('/mapa')} className="btn-cyber-primary" style={{marginTop: '15px'}}>
+                    <i className="fa-solid fa-map-location-dot"></i> Ir al Mapa
+                  </button>
+                </>
+              )}
             </div>
           ) : (
             <div className="parking-list">
@@ -323,7 +409,20 @@ export default function DashboardPage() {
         .toast-notification.error { background: #ef4444; color: white; border: 2px solid #b91c1c; }
         .toast-notification.syncing { background: #3b82f6; color: white; border: 2px solid #2563eb; }
         
-        .dashboard-grid { display: flex; gap: 30px; align-items: flex-start; }
+        .dashboard-grid { display: flex; gap: 30px; align-items: flex-start; flex-wrap: wrap; }
+        
+        /* KPI METRICS */
+        .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; width: 100%; }
+        .kpi-card { display: flex; align-items: center; gap: 15px; padding: 18px 20px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; transition: 0.3s; }
+        .kpi-card:hover { border-color: rgba(59, 130, 246, 0.2); transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.2); }
+        .kpi-icon { width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0; }
+        .kpi-icon.blue { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+        .kpi-icon.green { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+        .kpi-icon.amber { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+        .kpi-icon.purple { background: rgba(139, 92, 246, 0.15); color: #a78bfa; }
+        .kpi-data { display: flex; flex-direction: column; }
+        .kpi-value { font-size: 1.6rem; font-weight: 900; color: white; line-height: 1; }
+        .kpi-label { font-size: 0.75rem; color: #64748b; font-weight: 600; margin-top: 3px; }
         
         .form-panel { flex: 1; min-width: 0; padding: 30px; }
         .form-panel h3 { margin: 0 0 5px 0; font-size: 1.4rem; display: flex; align-items: center; gap: 10px; }
@@ -387,6 +486,16 @@ export default function DashboardPage() {
         @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.5); opacity: 0.5; } 100% { transform: scale(1); opacity: 1; } }
         @keyframes slideLeft { from { transform: translateX(100px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); backdrop-filter: blur(5px); z-index: 10000; display: flex; align-items: center; justify-content: center; animation: fadeIn 0.3s ease; }
+        .modal-content { padding: 30px; max-width: 400px; text-align: center; border: 1px solid rgba(239, 68, 68, 0.3); background: rgba(15, 23, 42, 0.95); }
+        .modal-content h3 { margin-top: 0; color: white; font-size: 1.4rem; }
+        .modal-content p { color: #94a3b8; margin: 20px 0; }
+        .modal-actions { display: flex; gap: 15px; justify-content: center; }
+        .btn-cancel { background: transparent; border: 1px solid rgba(255,255,255,0.2); color: white; padding: 10px 20px; border-radius: 12px; cursor: pointer; transition: 0.3s; font-weight: 700; }
+        .btn-cancel:hover { background: rgba(255,255,255,0.1); }
+        
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        
         /* RESPONSIVIDAD MOBILE */
         @media (max-width: 1000px) {
           .dashboard-grid { flex-direction: column; }
@@ -399,6 +508,7 @@ export default function DashboardPage() {
           .responsive-row { flex-direction: column; }
           .parking-item { flex-direction: column; align-items: flex-start; gap: 15px; }
           .occupancy-controls { width: 100%; justify-content: space-between; }
+          .kpi-row { grid-template-columns: repeat(2, 1fr); }
         }
       `}</style>
     </section>

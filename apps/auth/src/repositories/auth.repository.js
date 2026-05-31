@@ -7,15 +7,31 @@ export const AuthRepository = {
     return data;
   },
 
-  async signUp(email, password, nombre) {
+  async signUp(email, password, nombre, rol) {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { nombre_completo: nombre },
+        data: { nombre, rol },
       },
     });
     if (error) throw new Error(error.message);
+    
+    // Si la DB no crea el perfil automáticamente vía trigger, lo creamos aquí:
+    if (data?.user) {
+      const { getServiceSupabase } = await import('@parkings/supabase-db');
+      try {
+        const adminDb = getServiceSupabase();
+        await adminDb.from('perfiles').insert({
+          id: data.user.id,
+          nombre,
+          rol
+        });
+      } catch (e) {
+        console.error('Error al insertar perfil en Service Role (auth microservice)', e);
+      }
+    }
+
     return data;
   }
 };

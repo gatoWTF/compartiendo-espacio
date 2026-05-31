@@ -16,8 +16,8 @@ async function seed() {
   console.log("Creando cuentas de prueba en Supabase...");
 
   const testAccounts = [
-    { email: 'anfitrion@test.com', password: 'password123', nombre: 'Arrendador Test' },
-    { email: 'usuario@test.com', password: 'password123', nombre: 'Conductor Test' }
+    { email: 'anfitrion@test.com', password: 'password123', nombre: 'Arrendador Test', rol: 'anfitrion' },
+    { email: 'usuario@test.com', password: 'password123', nombre: 'Conductor Test', rol: 'cliente' }
   ];
 
   for (const account of testAccounts) {
@@ -27,6 +27,7 @@ async function seed() {
       options: {
         data: {
           nombre: account.nombre,
+          rol: account.rol
         }
       }
     });
@@ -34,7 +35,16 @@ async function seed() {
     if (error) {
       console.error(`❌ Error al crear cuenta ${account.email}:`, error.message);
     } else {
-      console.log(`✅ Cuenta creada: ${account.email} / ${account.password}`);
+      console.log(`✅ Cuenta creada: ${account.email} / ${account.password} (Rol: ${account.rol})`);
+      
+      // Insert profile explicitly in seed just in case trigger fails
+      if (data?.user) {
+        await supabase.from('perfiles').insert({
+          id: data.user.id,
+          nombre: account.nombre,
+          rol: account.rol
+        }).select();
+      }
     }
   }
 

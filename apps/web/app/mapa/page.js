@@ -1,4 +1,5 @@
 'use client';
+import { useState, useEffect } from 'react';
 import { useMapRadar } from '../../src/hooks/useMapRadar';
 import dynamic from 'next/dynamic';
 
@@ -6,14 +7,411 @@ const Map = dynamic(() => import('../../src/components/Map'), { ssr: false });
 
 export default function MapaPageContainer() {
   const { state, actions } = useMapRadar();
+  const [filters, setFilters] = useState({ p2p: false, pmr: false });
   
+  // Sincronizar el radio local con el global del hook para fluidez
+  const [localRadius, setLocalRadius] = useState(state.radius);
+
+  const handleGPS = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((pos) => {
+        if (window.__mapInstance) {
+          window.__mapInstance.setView([pos.coords.latitude, pos.coords.longitude], 15);
+          // Actualizar centro del radar visualmente
+          if (window.__radarCircle) {
+            window.__radarCircle.setLatLng([pos.coords.latitude, pos.coords.longitude]);
+          }
+        }
+      });
+    }
+  };
+
+  // Convertir slider (1-5) a kms reales
+  const radiusMap = { 1: 0.5, 2: 1, 3: 2, 4: 3, 5: 5 };
+  
+  const handleRadiusChange = (e) => {
+    const val = parseInt(e.target.value);
+    const km = radiusMap[val];
+    setLocalRadius(km);
+    actions.setRadius(km);
+  };
+
+  // Valor inverso para setear el slider desde el state (por si cambia externamente)
+  const getSliderVal = (km) => {
+    return Object.keys(radiusMap).find(k => radiusMap[k] === km) || 3; // default 2km -> 3
+  };
+
   return (
-    <Map 
-      location={state.userLoc} 
-      isLoading={state.loading} 
-      error={state.reserveError} 
-      parkings={state.parkings} 
-      onSpotSelect={actions.setSelectedSpot} 
-    />
+    <div className="map-page-wrapper">
+      
+      {/* ── PANEL DE RADAR (Top Left - True Glassmorphism) ── */}
+      <div className="radar-overlay">
+        <div className="glass-panel-strict">
+          <div className="panel-header">
+            <i className="fa-solid fa-satellite-dish pulse-icon text-green-500"></i>
+            <span>Radar de Proximidad</span>
+          </div>
+          
+          <div className="panel-divider"></div>
+
+          {/* Control de Alcance (Slider) */}
+          <div className="control-group">
+            <div className="radar-header">
+              <span className="control-label">ALCANCE</span>
+              <span className="control-value">{localRadius < 1 ? `${localRadius*1000} m` : `${localRadius} km`}</span>
+            </div>
+            <input 
+              type="range" 
+              min="1" 
+              max="5" 
+              step="1"
+              value={getSliderVal(localRadius)} 
+              onChange={handleRadiusChange}
+              className="modern-slider"
+            />
+            <div className="slider-marks">
+              <span>500m</span>
+              <span>1k</span>
+              <span>2k</span>
+              <span>3k</span>
+              <span>5k</span>
+            </div>
+          </div>
+
+          <div className="panel-divider"></div>
+
+          {/* Filtros Rápidos (Switches) */}
+          <div className="control-group">
+            <div className="filter-row">
+              <span className="switch-text">Mostrar solo P2P</span>
+              <label className="modern-switch">
+                <input 
+                  type="checkbox" 
+                  checked={filters.p2p} 
+                  onChange={(e) => setFilters({...filters, p2p: e.target.checked})} 
+                />
+                <span className="slider round"></span>
+              </label>
+            </div>
+
+            <div className="filter-row">
+              <span className="switch-text text-blue-400">Mostrar PMR</span>
+              <label className="modern-switch">
+                <input 
+                  type="checkbox" 
+                  checked={filters.pmr} 
+                  onChange={(e) => setFilters({...filters, pmr: e.target.checked})} 
+                />
+                <span className="slider round blue"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <button className="btn-gps-strict" onClick={handleGPS} aria-label="Centrar en mi ubicación">
+          <i className="fa-solid fa-location-crosshairs"></i>
+        </button>
+      </div>
+
+      {/* ── ÁREA DEL MAPA ── */}
+      <div className="map-area">
+        <Map 
+          location={state.userLoc} 
+          isLoading={state.loading} 
+          error={state.reserveError} 
+          parkings={state.parkings} 
+          onSpotSelect={actions.setSelectedSpot}
+          radius={localRadius}
+          filters={filters}
+        />
+      </div>
+
+      {/* ── PANEL DE RESERVA ── */}
+      {state.selectedSpot && (
+        <div className={`glass-panel-strict reservation-panel ${state.selectedSpot ? 'slide-in' : ''}`}>
+          <div className="res-header">
+            <h3><i className="fa-solid fa-square-parking text-blue-500 mr-2"></i> {state.selectedSpot.nombre}</h3>
+            <button className="btn-close-strict" onClick={() => actions.setSelectedSpot(null)}>
+              <i className="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+          
+          <div className="res-body">
+            <p className="res-row"><i className="fa-solid fa-user-tie"></i> <span>{state.selectedSpot.arrendador || 'Red P2P'}</span></p>
+            <p className="res-row">
+              <i className="fa-solid fa-car"></i> 
+              <span className="text-green-500 font-bold">
+                {(state.selectedSpot.total_spots || 10) - (state.selectedSpot.occupied_spots || 0)} disp.
+              </span>
+            </p>
+            {state.selectedSpot.precio_hora !== undefined && (
+              <p className="res-row"><i className="fa-solid fa-coins"></i> <span className="text-yellow-500 font-bold">
+                {state.selectedSpot.precio_hora === 0 ? 'Gratuito' : `$${state.selectedSpot.precio_hora?.toLocaleString()}/hr`}
+              </span></p>
+            )}
+            {state.selectedSpot.es_pmr && (
+              <div className="pmr-badge-strict mt-3">
+                <i className="fa-solid fa-wheelchair"></i> Accesibilidad PMR Habilitada
+              </div>
+            )}
+
+            <div className="mt-5 pt-4 border-t border-white/10">
+              {state.reserveStep === 0 && (
+                <button className="btn-reserve-strict" onClick={actions.handleReserve}>
+                  SOLICITAR ESPACIO
+                </button>
+              )}
+              {state.reserveStep > 0 && state.reserveStep < 3 && (
+                <div className="text-center text-sm text-slate-300 py-3 animate-pulse">
+                  <i className="fa-solid fa-circle-notch fa-spin text-blue-500 mr-2"></i> Procesando transacción...
+                </div>
+              )}
+              {state.reserveStep === 3 && (
+                <div className="text-center text-sm text-green-500 font-bold py-3 bg-green-500/10 rounded-lg border border-green-500/20">
+                  <i className="fa-solid fa-circle-check mr-2"></i> ¡Match Exitoso!
+                </div>
+              )}
+              {state.reserveError && (
+                <div className="text-center text-sm text-red-400 py-3 bg-red-500/10 rounded-lg mt-2 border border-red-500/20">
+                  {state.reserveError}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style jsx>{`
+        .map-page-wrapper {
+          position: relative;
+          width: 100%;
+          height: calc(100vh - 80px);
+          overflow: hidden;
+          background: #020617; /* Slate 950 */
+        }
+        .map-area { width: 100%; height: 100%; }
+
+        /* === TRUE GLASSMORPHISM === */
+        .glass-panel-strict {
+          background: rgba(15, 23, 42, 0.6);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 16px;
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+          color: white;
+        }
+
+        /* === RADAR OVERLAY === */
+        .radar-overlay {
+          position: absolute;
+          top: 24px;
+          left: 24px;
+          z-index: 1000;
+          display: flex;
+          gap: 16px;
+          align-items: flex-start;
+          width: 320px;
+        }
+        
+        .radar-overlay > .glass-panel-strict {
+          flex: 1;
+          padding: 20px;
+        }
+
+        .panel-header {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          font-family: 'Inter', sans-serif;
+          font-weight: 700;
+          font-size: 1.05rem;
+          color: #f8fafc;
+        }
+
+        .pulse-icon {
+          animation: text-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes text-pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
+        }
+
+        .panel-divider {
+          height: 1px;
+          background: rgba(255, 255, 255, 0.08);
+          margin: 16px 0;
+        }
+
+        /* === CONTROLS === */
+        .radar-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 12px;
+        }
+
+        .filter-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding-top: 12px;
+        }
+
+        .control-label {
+          font-size: 0.8rem;
+          color: #94a3b8;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+        .control-value {
+          font-size: 0.9rem;
+          color: #60a5fa;
+          font-weight: 800;
+        }
+
+        /* Modern Slider */
+        .modern-slider {
+          -webkit-appearance: none;
+          width: 100%;
+          height: 6px;
+          background: rgba(255, 255, 255, 0.1);
+          border-radius: 3px;
+          outline: none;
+          margin: 10px 0;
+        }
+        .modern-slider::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          background: #3b82f6;
+          cursor: pointer;
+          box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+          transition: transform 0.1s;
+        }
+        .modern-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        .slider-marks {
+          display: flex;
+          justify-content: space-between;
+          padding: 0 4px;
+          font-size: 0.65rem;
+          color: #64748b;
+          font-weight: 600;
+        }
+
+        /* Modern Switch */
+        .modern-switch {
+          position: relative;
+          display: inline-block;
+          width: 40px;
+          height: 20px;
+        }
+        .switch-text {
+          font-size: 0.9rem;
+          color: #cbd5e1;
+          font-weight: 500;
+        }
+        .modern-switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+          position: absolute;
+          cursor: pointer;
+          top: 0; left: 0; right: 0; bottom: 0;
+          background-color: rgba(255, 255, 255, 0.1);
+          transition: .3s;
+          border-radius: 9999px;
+        }
+        .slider:before {
+          position: absolute;
+          content: "";
+          height: 16px; width: 16px;
+          left: 2px; bottom: 2px;
+          background-color: #cbd5e1;
+          transition: .3s;
+          border-radius: 50%;
+        }
+        input:checked + .slider { background-color: #22c55e; }
+        input:checked + .slider.blue { background-color: #3b82f6; }
+        input:checked + .slider:before {
+          transform: translateX(20px);
+          background-color: white;
+        }
+
+        /* === GPS BUTTON === */
+        .btn-gps-strict {
+          width: 42px;
+          height: 42px;
+          border-radius: 12px;
+          background: rgba(15, 23, 42, 0.6);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          color: #94a3b8;
+          font-size: 1.1rem;
+          display: flex; align-items: center; justify-content: center;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+        }
+        .btn-gps-strict:hover {
+          color: white;
+          background: rgba(59, 130, 246, 0.2);
+          border-color: rgba(59, 130, 246, 0.4);
+        }
+
+        /* === RESERVATION PANEL === */
+        .reservation-panel {
+          position: absolute;
+          bottom: 24px;
+          right: 24px;
+          width: 320px;
+          max-width: calc(100vw - 48px);
+          z-index: 1000;
+          transform: translateX(120%);
+          transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .reservation-panel.slide-in { transform: translateX(0); }
+        .res-header {
+          display: flex; justify-content: space-between; align-items: center;
+          padding: 16px 20px;
+          border-bottom: 1px solid rgba(255,255,255,0.08);
+          background: rgba(0,0,0,0.2);
+          border-radius: 16px 16px 0 0;
+        }
+        .res-header h3 { margin: 0; font-size: 1rem; font-weight: 700; font-family: 'Inter', sans-serif; }
+        .btn-close-strict {
+          background: transparent; border: none; color: #64748b; cursor: pointer; font-size: 1.1rem; transition: color 0.2s;
+        }
+        .btn-close-strict:hover { color: white; }
+        
+        .res-body { padding: 20px; }
+        .res-row { margin: 0 0 12px 0; font-size: 0.9rem; color: #cbd5e1; display: flex; align-items: center; gap: 12px; }
+        .res-row i { color: #64748b; width: 16px; text-align: center; }
+        
+        .pmr-badge-strict {
+          display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+          background: rgba(59,130,246,0.1); color: #60a5fa;
+          padding: 6px 12px; border-radius: 8px; border: 1px solid rgba(59,130,246,0.2);
+          font-size: 0.8rem; font-weight: 600; width: 100%;
+        }
+
+        .btn-reserve-strict {
+          width: 100%;
+          background: #2563eb;
+          color: white;
+          font-weight: 700; font-size: 0.9rem; letter-spacing: 0.5px;
+          padding: 12px; border-radius: 10px; border: none; cursor: pointer;
+          transition: background 0.2s;
+        }
+        .btn-reserve-strict:hover { background: #1d4ed8; }
+
+        @media (max-width: 600px) {
+          .radar-overlay { width: calc(100% - 48px); }
+          .btn-gps-strict { position: absolute; right: 0; top: 0; }
+        }
+      `}</style>
+    </div>
   );
 }

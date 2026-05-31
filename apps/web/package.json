@@ -9,9 +9,15 @@
     "test": "node --test tests/api.test.js"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.4.0",
+    "@parkings/supabase-db": "^1.0.0",
     "leaflet": "^1.9.4",
+    "leaflet.heat": "^0.2.0",
     "next": "latest",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "react-hook-form": "^7.76.1",
+    "react-hot-toast": "^2.6.0",
+    "zod": "^4.4.3"
   }
 }

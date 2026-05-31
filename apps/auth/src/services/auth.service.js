@@ -16,14 +16,15 @@ export const AuthService = {
   },
 
   async register(payload) {
-    const { email, password, nombre } = payload;
-    const data = await AuthRepository.signUp(email, password, nombre);
+    const { email, password, nombre, rol } = payload;
+    const data = await AuthRepository.signUp(email, password, nombre, rol || 'cliente');
     
     return {
       message: 'Cuenta creada. Revisa tu correo para confirmar.',
       user: {
         id: data.user.id,
         email: data.user.email,
+        rol: rol || 'cliente'
       },
     };
   }

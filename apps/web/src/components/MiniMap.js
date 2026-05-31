@@ -68,10 +68,54 @@ export default function MiniMap({ lat, lng, setLat, setLng }) {
     }
   }, [lat, lng]);
 
+  const handleGPS = () => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition((pos) => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      setLat(lat.toFixed(6));
+      setLng(lng.toFixed(6));
+      if (mapInstance.current) {
+        mapInstance.current.flyTo([lat, lng], 16, { animate: true, duration: 1 });
+      }
+    }, null, { enableHighAccuracy: true });
+  };
+
   return (
-    <div
-      ref={mapRef}
-      style={{ width: '100%', height: '100%', borderRadius: '8px' }}
-    />
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <div
+        ref={mapRef}
+        style={{ width: '100%', height: '100%', borderRadius: '8px' }}
+      />
+      <button
+        type="button"
+        onClick={handleGPS}
+        title="Usar mi ubicación GPS"
+        style={{
+          position: 'absolute',
+          bottom: '12px',
+          right: '12px',
+          zIndex: 1000,
+          width: '40px',
+          height: '40px',
+          borderRadius: '12px',
+          background: 'rgba(15, 23, 42, 0.9)',
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(59, 130, 246, 0.3)',
+          color: '#60a5fa',
+          fontSize: '1rem',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          transition: '0.3s',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+        }}
+        onMouseEnter={(e) => { e.target.style.background = 'rgba(59, 130, 246, 0.3)'; e.target.style.color = 'white'; }}
+        onMouseLeave={(e) => { e.target.style.background = 'rgba(15, 23, 42, 0.9)'; e.target.style.color = '#60a5fa'; }}
+      >
+        <i className="fa-solid fa-location-crosshairs"></i>
+      </button>
+    </div>
   );
 }

@@ -29,9 +29,9 @@ export const AuthController = {
   async register(request) {
     try {
       const body = await request.json();
-      if (!body.email || !body.password || !body.nombre) {
+      if (!body.email || !body.password || !body.nombre || !body.rol) {
         return NextResponse.json(
-          { success: false, error: 'Nombre, email y contraseña son obligatorios.' },
+          { success: false, error: 'Nombre, email, contraseña y rol son obligatorios.' },
           { status: 400, headers: CORS_HEADERS }
         );
       }
