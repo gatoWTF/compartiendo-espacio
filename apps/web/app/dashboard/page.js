@@ -279,40 +279,47 @@ export default function DashboardPage() {
             <p className="panel-desc">Añade tu espacio a la red descentralizada de estacionamientos.</p>
             
             <form onSubmit={handleCreate} className="create-form">
-              <div className="input-row">
+              {/* 1. Ubicar espacio */}
+              <div className="form-block">
                 <div className="input-group search-group">
                   <i className="fa-solid fa-map-pin icon"></i>
                   <input type="text" placeholder="Ej: Avenida Falsa 123" value={direccion} onChange={e => setDireccion(e.target.value)} />
-                  <button type="button" onClick={handleSearchAddress} className="btn-search">UBICAR</button>
+                  <button type="button" onClick={handleSearchAddress} className="btn-search">UBICAR EN EL MAPA</button>
+                </div>
+                
+                <div className="map-container">
+                  <MiniMapComponent lat={lat} lng={lng} setLat={setLat} setLng={setLng} />
                 </div>
               </div>
               
-              <div className="map-container">
-                <MiniMapComponent lat={lat} lng={lng} setLat={setLat} setLng={setLng} />
+              {/* 2. Configurar características */}
+              <div className="form-block">
+                <div className="input-row">
+                  <div className="input-group">
+                    <i className="fa-solid fa-signature icon"></i>
+                    <input type="text" placeholder="Nombre de la Plaza" value={nombre} onChange={e => setNombre(e.target.value)} required />
+                  </div>
+                  <div className="input-group">
+                    <i className="fa-solid fa-car icon"></i>
+                    <input type="number" min="1" placeholder="Cupos" value={totalSpots} onChange={e => setTotalSpots(e.target.value)} required />
+                  </div>
+                </div>
+                
+                <div className="checkbox-pmr">
+                  <input type="checkbox" id="pmr-check" checked={esPmr} onChange={e => setEsPmr(e.target.checked)} style={{width: '20px', height: '20px', accentColor: '#38bdf8'}} />
+                  <label htmlFor="pmr-check" style={{display: 'flex', flexDirection: 'column', cursor: 'pointer'}}>
+                    <span style={{color: 'white', fontSize: '1.05rem', fontWeight: 700}}><i className="fa-solid fa-wheelchair" style={{marginRight: '8px', color: '#38bdf8'}}></i> Habilitar Zona Prioritaria PMR</span>
+                    <span style={{color: '#94a3b8', fontSize: '0.85rem', marginTop: '4px'}}>Destaca este nodo para usuarios con movilidad reducida.</span>
+                  </label>
+                </div>
               </div>
               
-              <div className="input-row responsive-row">
-                <div className="input-group">
-                  <i className="fa-solid fa-signature icon"></i>
-                  <input type="text" placeholder="Nombre de la Plaza" value={nombre} onChange={e => setNombre(e.target.value)} required />
-                </div>
-                <div className="input-group small">
-                  <i className="fa-solid fa-car icon"></i>
-                  <input type="number" min="1" placeholder="Cupos" value={totalSpots} onChange={e => setTotalSpots(e.target.value)} required />
-                </div>
+              {/* 3. Publicar nodo */}
+              <div className="form-block">
+                <button type="submit" className="btn-cyber-primary submit-btn" style={{width: '100%'}}>
+                  <i className="fa-solid fa-cloud-arrow-up"></i> PUBLICAR NODO EN LA RED P2P
+                </button>
               </div>
-              
-              <label className="checkbox-pmr">
-                <input type="checkbox" checked={esPmr} onChange={e => setEsPmr(e.target.checked)} />
-                <span>
-                  <i className="fa-solid fa-wheelchair"></i>
-                  Habilitar Zona Prioritaria PMR
-                </span>
-              </label>
-              
-              <button type="submit" className="btn-cyber-primary submit-btn">
-                <i className="fa-solid fa-cloud-arrow-up"></i> PUBLICAR EN SUPABASE
-              </button>
             </form>
           </div>
         )}
@@ -434,14 +441,15 @@ export default function DashboardPage() {
         .form-panel h3 { margin: 0 0 5px 0; font-size: 1.4rem; display: flex; align-items: center; gap: 10px; }
         .panel-desc { color: #64748b; font-size: 0.85rem; margin-bottom: 25px; }
         
-        .create-form { display: flex; flexDirection: column; gap: 15px; }
-        .input-row { display: flex; gap: 15px; width: 100%; }
-        .input-group { position: relative; flex: 1; background: rgba(0,0,0,0.4); border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); transition: 0.3s; }
+        .create-form { display: flex; flex-direction: column; gap: 20px; width: 100%; }
+        .form-block { display: flex; flex-direction: column; gap: 15px; }
+        .input-row { display: flex; flex-direction: column; gap: 15px; width: 100%; }
+        .input-group { position: relative; width: 100%; background: rgba(0,0,0,0.4); border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); transition: 0.3s; }
         .input-group:focus-within { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
         .input-group .icon { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #64748b; }
         .input-group input { width: 100%; padding: 15px 15px 15px 45px; background: transparent; border: none; color: white; outline: none; }
         
-        .search-group { display: flex; padding-right: 5px; }
+        .search-group { display: flex; flex-direction: row; padding-right: 5px; }
         .btn-search { background: #3b82f6; color: white; border: none; border-radius: 8px; margin: 5px; padding: 0 15px; font-weight: 800; cursor: pointer; transition: 0.3s; }
         .btn-search:hover { background: #2563eb; }
         

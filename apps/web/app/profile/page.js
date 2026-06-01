@@ -42,7 +42,7 @@ export default function ProfilePage() {
         .from('perfiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
         
       if (perfilError && perfilError.code !== 'PGRST116') throw perfilError;
       if (perfilData) setPerfil(perfilData);
