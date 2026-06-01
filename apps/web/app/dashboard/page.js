@@ -176,7 +176,7 @@ export default function DashboardPage() {
       if (result.success) {
         setMyParkings(myParkings.filter(p => !selectedIds.includes(p.id)));
         setSelectedIds([]);
-        showToast(`${selectedIds.length} nodo(s) eliminado(s) de Supabase.`, 'success');
+        showToast(`${selectedIds.length} estacionamiento(s) eliminado(s) de Supabase.`, 'success');
       }
     } catch (err) {
       showToast(err.message || 'Error al eliminar.', 'error');
@@ -241,7 +241,7 @@ export default function DashboardPage() {
               <div className="kpi-icon blue"><i className="fa-solid fa-warehouse"></i></div>
               <div className="kpi-data">
                 <span className="kpi-value">{myParkings.length}</span>
-                <span className="kpi-label">Nodos Activos</span>
+                <span className="kpi-label">Plazas Activas</span>
               </div>
             </div>
             <div className="kpi-card">
@@ -275,8 +275,8 @@ export default function DashboardPage() {
         {/* FORMULARIO NUEVO ESPACIO (Sólo Anfitriones) */}
         {session?.user?.rol === 'anfitrion' && (
           <div className="glass-panel form-panel">
-            <h3><i className="fa-solid fa-satellite-dish"></i> Desplegar Nuevo Nodo</h3>
-            <p className="panel-desc">Añade tu espacio a la red descentralizada de estacionamientos.</p>
+            <h3><i className="fa-solid fa-square-parking"></i> Publicar Estacionamiento</h3>
+            <p className="panel-desc">Añade tu plaza a la red y comienza a generar ingresos con tu espacio disponible.</p>
             
             <form onSubmit={handleCreate} className="create-form">
               {/* 1. Ubicar espacio */}
@@ -309,7 +309,7 @@ export default function DashboardPage() {
                   <input type="checkbox" id="pmr-check" checked={esPmr} onChange={e => setEsPmr(e.target.checked)} style={{width: '20px', height: '20px', accentColor: '#38bdf8'}} />
                   <label htmlFor="pmr-check" style={{display: 'flex', flexDirection: 'column', cursor: 'pointer'}}>
                     <span style={{color: 'white', fontSize: '1.05rem', fontWeight: 700}}><i className="fa-solid fa-wheelchair" style={{marginRight: '8px', color: '#38bdf8'}}></i> Habilitar Zona Prioritaria PMR</span>
-                    <span style={{color: '#94a3b8', fontSize: '0.85rem', marginTop: '4px'}}>Destaca este nodo para usuarios con movilidad reducida.</span>
+                    <span style={{color: '#94a3b8', fontSize: '0.85rem', marginTop: '4px'}}>Destaca este estacionamiento para usuarios con movilidad reducida.</span>
                   </label>
                 </div>
               </div>
@@ -317,7 +317,7 @@ export default function DashboardPage() {
               {/* 3. Publicar nodo */}
               <div className="form-block">
                 <button type="submit" className="btn-cyber-primary submit-btn" style={{width: '100%'}}>
-                  <i className="fa-solid fa-cloud-arrow-up"></i> PUBLICAR NODO EN LA RED P2P
+                  <i className="fa-solid fa-cloud-arrow-up"></i> PUBLICAR ESTACIONAMIENTO
                 </button>
               </div>
             </form>
@@ -329,7 +329,7 @@ export default function DashboardPage() {
           <div className="inventory-header">
             <h3>
               {session?.user?.rol === 'anfitrion' ? (
-                <><i className="fa-solid fa-server"></i> Nodos Publicados ({myParkings.length})</>
+                <><i className="fa-solid fa-warehouse"></i> Mis Estacionamientos ({myParkings.length})</>
               ) : (
                 <><i className="fa-solid fa-car"></i> Mis Vehículos ({myParkings.length})</>
               )}
@@ -352,8 +352,8 @@ export default function DashboardPage() {
             <div className="glass-panel empty-state">
               {session?.user?.rol === 'anfitrion' ? (
                 <>
-                  <i className="fa-solid fa-network-wired"></i>
-                  <p>Tu red está vacía. ¡Despliega tu primer nodo!</p>
+                  <i className="fa-solid fa-square-parking"></i>
+                  <p>Aún no tienes plazas publicadas. Añade tu primer estacionamiento para comenzar a recibir reservas.</p>
                 </>
               ) : (
                 <>

@@ -14,7 +14,7 @@ export default function ProfilePage() {
   const [nuevoEmail, setNuevoEmail] = useState('');
   const [activeTab, setActiveTab] = useState('personales'); // personales, vehiculos, pmr
   
-  const [nuevoVehiculo, setNuevoVehiculo] = useState({ placa: '', modelo: '', color: '' });
+  const [nuevoVehiculo, setNuevoVehiculo] = useState({ patente: '', marca: '', modelo: '', color: '' });
   
   const router = useRouter();
 
@@ -47,13 +47,18 @@ export default function ProfilePage() {
       if (perfilError && perfilError.code !== 'PGRST116') throw perfilError;
       if (perfilData) setPerfil(perfilData);
 
-      const { data: vehiculosData, error: vehiculosError } = await supabase
-        .from('vehiculos')
-        .select('*')
-        .eq('user_id', userId);
-        
-      if (vehiculosError) throw vehiculosError;
-      if (vehiculosData) setVehiculos(vehiculosData);
+      try {
+        const { data: vehiculosData, error: vehiculosError } = await supabase
+          .from('vehiculos')
+          .select('*')
+          .eq('user_id', userId);
+          
+        if (vehiculosError) throw vehiculosError;
+        if (vehiculosData) setVehiculos(vehiculosData);
+      } catch (vehiculosErr) {
+        console.error('Error cargando vehículos (puede no existir la tabla):', vehiculosErr);
+        setVehiculos([]);
+      }
 
     } catch (error) {
       console.error(error);
@@ -82,7 +87,7 @@ export default function ProfilePage() {
 
   const handleAddVehiculo = async (e) => {
     e.preventDefault();
-    if (!nuevoVehiculo.placa || !nuevoVehiculo.modelo || !nuevoVehiculo.color) {
+    if (!nuevoVehiculo.patente || !nuevoVehiculo.marca || !nuevoVehiculo.modelo || !nuevoVehiculo.color) {
       toast.error('Completa todos los campos del vehículo');
       return;
     }
@@ -96,7 +101,7 @@ export default function ProfilePage() {
       if (error) throw error;
       
       setVehiculos([...vehiculos, data[0]]);
-      setNuevoVehiculo({ placa: '', modelo: '', color: '' });
+      setNuevoVehiculo({ patente: '', marca: '', modelo: '', color: '' });
       toast.success('Vehículo agregado a la red');
     } catch (error) {
       toast.error(error.message);
@@ -176,7 +181,7 @@ export default function ProfilePage() {
   if (loading) return (
     <div className="loader-screen">
       <i className="fa-solid fa-satellite fa-spin"></i>
-      <p>Autenticando Nodo...</p>
+      <p>Cargando Perfil...</p>
       <style jsx>{`
         .loader-screen { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #3b82f6; font-size: 2rem; gap: 15px; background: #020617; }
         .loader-screen p { font-size: 1rem; font-weight: 800; letter-spacing: 2px; }
@@ -204,10 +209,10 @@ export default function ProfilePage() {
             <div className="avatar-overlay"><i className="fa-solid fa-camera"></i></div>
             <input id="avatar-input" type="file" accept="image/png,image/jpeg,image/webp" onChange={handleAvatarUpload} style={{display:'none'}} />
           </div>
-          <h1>{perfil.nombre || 'Operador de Red'}</h1>
+          <h1>{perfil.nombre || 'Usuario Registrado'}</h1>
           <p className="email-tag">{session?.user?.email}</p>
           <div className="status-badge">
-             <span className="dot pulse-green"></span> NODO ACTIVO
+             <span className="dot pulse-green"></span> CUENTA ACTIVA
           </div>
           
           {/* Rol del usuario */}
@@ -251,7 +256,7 @@ export default function ProfilePage() {
           
           {activeTab === 'personales' && (
             <div className="tab-pane fade-in">
-              <h2>Identidad en la Red P2P</h2>
+              <h2>Identidad de Usuario</h2>
               
               {/* ACCOUNT INFO CARDS */}
               <div className="account-info-grid">
@@ -265,7 +270,7 @@ export default function ProfilePage() {
                 <div className="info-card">
                   <div className="info-card-icon role"><i className={`fa-solid ${perfil.rol === 'anfitrion' ? 'fa-building' : 'fa-car'}`}></i></div>
                   <div className="info-card-data">
-                    <span className="info-label">ROL EN LA RED</span>
+                    <span className="info-label">TIPO DE CUENTA</span>
                     <span className="info-value">{perfil.rol === 'anfitrion' ? 'Anfitrión' : 'Conductor'}</span>
                   </div>
                 </div>
@@ -314,14 +319,14 @@ export default function ProfilePage() {
               
               <div className="vehicles-list">
                 {vehiculos.length === 0 ? (
-                  <div className="empty-state">No tienes vehículos registrados.</div>
+                  <div className="empty-state">Aún no has registrado ningún vehículo.</div>
                 ) : (
                   vehiculos.map(v => (
                     <div key={v.id} className="vehicle-card">
                       <div className="v-icon"><i className="fa-solid fa-car-side"></i></div>
                       <div className="v-details">
-                        <strong>{v.placa.toUpperCase()}</strong>
-                        <span>{v.modelo} - {v.color}</span>
+                        <strong>{v.patente?.toUpperCase() || v.placa?.toUpperCase()}</strong>
+                        <span>{v.marca ? `${v.marca} ` : ''}{v.modelo} - {v.color}</span>
                       </div>
                       <button onClick={() => handleRemoveVehiculo(v.id)} className="btn-icon-danger" title="Eliminar">
                         <i className="fa-solid fa-trash"></i>
@@ -334,10 +339,13 @@ export default function ProfilePage() {
               <h3 className="section-divider">Agregar Nuevo Vehículo</h3>
               <form onSubmit={handleAddVehiculo} className="cyber-form vehicle-form">
                 <div className="input-wrap">
-                  <input type="text" placeholder="Patente (Ej. AB1234)" value={nuevoVehiculo.placa} onChange={e => setNuevoVehiculo({...nuevoVehiculo, placa: e.target.value})} maxLength={6} required />
+                  <input type="text" placeholder="Patente" value={nuevoVehiculo.patente} onChange={e => setNuevoVehiculo({...nuevoVehiculo, patente: e.target.value})} maxLength={6} required />
                 </div>
                 <div className="input-wrap">
-                  <input type="text" placeholder="Modelo (Ej. Toyota Yaris)" value={nuevoVehiculo.modelo} onChange={e => setNuevoVehiculo({...nuevoVehiculo, modelo: e.target.value})} required />
+                  <input type="text" placeholder="Marca (Ej. Toyota)" value={nuevoVehiculo.marca} onChange={e => setNuevoVehiculo({...nuevoVehiculo, marca: e.target.value})} required />
+                </div>
+                <div className="input-wrap">
+                  <input type="text" placeholder="Modelo (Ej. Yaris)" value={nuevoVehiculo.modelo} onChange={e => setNuevoVehiculo({...nuevoVehiculo, modelo: e.target.value})} required />
                 </div>
                 <div className="input-wrap">
                   <input type="text" placeholder="Color" value={nuevoVehiculo.color} onChange={e => setNuevoVehiculo({...nuevoVehiculo, color: e.target.value})} required />

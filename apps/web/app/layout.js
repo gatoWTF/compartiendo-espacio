@@ -2,8 +2,11 @@ import './globals.css';
 import Navbar from '../src/components/Navbar';
 
 export const metadata = {
-  title: "Parkings Together | Red P2P de Estacionamientos",
-  description: "La red de estacionamientos P2P más inteligente. Optimiza tu movilidad y genera ingresos compartiendo tu espacio.",
+  title: "Parkings Together | Encuentra y Comparte Estacionamientos",
+  description: "Encuentra estacionamientos cerca de ti y comienza a generar ingresos compartiendo tu plaza disponible.",
+  icons: {
+    icon: '/favicon.ico',
+  },
 };
 
 export default function RootLayout({ children }) {
