@@ -9,8 +9,10 @@ out/
 # turbo
 .turbo
 
-# env files
-.env*.local
+# env files (NUNCA commitear secretos; usar .env.example como plantilla)
+.env
+.env.*
+!.env.example
 
 # debug
 npm-debug.log*
