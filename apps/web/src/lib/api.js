@@ -92,11 +92,40 @@ export const api = {
     verificarDisponibilidad: (parkingId) =>
       fetchWithTimeout(`${RESERVAS_URL}/reserve?parkingId=${parkingId}`),
 
+    // crearReserva acepta opcionalmente fecha_inicio/fecha_fin (ISO 8601) para
+    // reserva PROFESIONAL anticipada; sin ellas, es reserva instantánea.
     crearReserva: async (data) =>
       fetchWithTimeout(`${RESERVAS_URL}/reserve`, {
         method: 'POST',
         headers: await authHeaders(),
         body: JSON.stringify(data),
+      }),
+
+    // Listado de reservas del usuario. scope: 'conductor' | 'arrendador'.
+    listar: async (scope = 'conductor') =>
+      fetchWithTimeout(`${RESERVAS_URL}/manage?scope=${scope}`, {
+        headers: await authHeaders(),
+      }),
+
+    confirmar: async (reserva_id) =>
+      fetchWithTimeout(`${RESERVAS_URL}/manage`, {
+        method: 'PATCH',
+        headers: await authHeaders(),
+        body: JSON.stringify({ action: 'confirmar', reserva_id }),
+      }),
+
+    cancelar: async (reserva_id) =>
+      fetchWithTimeout(`${RESERVAS_URL}/manage`, {
+        method: 'PATCH',
+        headers: await authHeaders(),
+        body: JSON.stringify({ action: 'cancelar', reserva_id }),
+      }),
+
+    reprogramar: async (reserva_id, fecha_inicio, fecha_fin) =>
+      fetchWithTimeout(`${RESERVAS_URL}/manage`, {
+        method: 'PATCH',
+        headers: await authHeaders(),
+        body: JSON.stringify({ action: 'reprogramar', reserva_id, fecha_inicio, fecha_fin }),
       }),
   },
 };

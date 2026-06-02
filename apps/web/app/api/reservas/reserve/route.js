@@ -58,21 +58,31 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    const { parking_id, user_id, start_time } = body;
+    const { parking_id, user_id, fecha_inicio, fecha_fin } = body;
     if (!parking_id || !user_id) {
       return NextResponse.json({ success: false, error: 'Faltan parking_id o user_id.' }, { status: 400 });
     }
 
     const db = getSupabaseWithToken(token);
 
-    // Transacción atómica vía RPC SECURITY DEFINER: verifica disponibilidad con
-    // bloqueo de fila (anti doble-reserva), inserta la reserva del auth.uid() y
-    // incrementa la ocupación, todo en una sola transacción del lado de Postgres.
-    // Sustituye a la Saga manual, que RLS bloqueaba (un conductor no es dueño del
-    // estacionamiento y no podía actualizar occupied_spots).
-    const { data: reserva, error } = await db.rpc('reservar_estacionamiento', {
-      p_estacionamiento_id: parking_id,
-    });
+    // Dos modos sobre la misma transacción atómica (RPC SECURITY DEFINER):
+    //  - PRO (reserva anticipada): si llegan fecha_inicio y fecha_fin, reserva una
+    //    ventana de tiempo validando capacidad por solapamiento; queda 'pendiente'
+    //    hasta que el arrendador la confirme.
+    //  - INSTANTÁNEA (legacy): sin fechas, ocupa un cupo ahora e incrementa
+    //    occupied_spots. Se conserva para el flujo de "estacionar ya".
+    let reserva, error;
+    if (fecha_inicio && fecha_fin) {
+      ({ data: reserva, error } = await db.rpc('crear_reserva_pro', {
+        p_estacionamiento_id: parking_id,
+        p_fecha_inicio: fecha_inicio,
+        p_fecha_fin: fecha_fin,
+      }));
+    } else {
+      ({ data: reserva, error } = await db.rpc('reservar_estacionamiento', {
+        p_estacionamiento_id: parking_id,
+      }));
+    }
 
     if (error) {
       const lleno = /lleno/i.test(error.message);
