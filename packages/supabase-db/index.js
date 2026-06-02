@@ -18,6 +18,23 @@ export const supabase = createClient(supabaseUrl || 'http://mock-supabase.local'
   }
 });
 
+// Cliente Supabase con el JWT del usuario (scoped). Se usa en route handlers
+// del servidor para que las políticas RLS evalúen auth.uid() = usuario real.
+// Usa la ANON KEY (pública) + el access_token del usuario en la cabecera Authorization.
+// NUNCA expone privilegios elevados: RLS sigue plenamente activo.
+export const getSupabaseWithToken = (accessToken) => {
+  return createClient(supabaseUrl || 'http://mock-supabase.local', anonKey || 'mock-key', {
+    global: {
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
+    },
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false
+    }
+  });
+};
+
 // Instancia de Supabase con Privilegios Elevados (Service Role)
 // IMPORTANTE: NUNCA usar esto en componentes de Next.js (Frontend) que corran en el cliente.
 export const getServiceSupabase = () => {

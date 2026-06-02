@@ -22,11 +22,13 @@ export function useMapRadar() {
 
   const fetchRadar = async (r, lat, lng) => {
     try {
-      const URL = process.env.NEXT_PUBLIC_MS_MAPAS_URL || 'http://localhost:3002/api/v1';
-      if (typeof window !== 'undefined' && (URL.includes('vercel') || window.location.hostname.includes('vercel'))) {
+      // Siempre mismo origen (/api/mapas). Funciona en Vercel sin microservicios
+      // externos ni CORS, de forma determinista (sin depender de env vars).
+      const URL = '/api/mapas';
+      if (typeof window !== 'undefined' && window.location.hostname.includes('vercel')) {
         setIsCloud(true);
       }
-      
+
       const res = await fetch(`${URL}/search?radius=${r}&lat=${lat}&lng=${lng}`, { cache: 'no-store' });
       const data = await res.json();
       return data.success ? data.data : [];
