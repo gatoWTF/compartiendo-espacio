@@ -45,14 +45,16 @@ DROP POLICY IF EXISTS "estacionamientos_select_all" ON public.estacionamientos;
 CREATE POLICY "estacionamientos_select_all" ON public.estacionamientos
   FOR SELECT USING (true);
 
--- Alta: solo anfitriones, y solo a su propio nombre (user_id = auth.uid()).
+-- Alta: solo arrendadores, y solo a su propio nombre (user_id = auth.uid()).
+-- NOTA: ejecutar 006_rename_rol_arrendador.sql para migrar el valor del rol.
 DROP POLICY IF EXISTS "estacionamientos_insert_anfitrion" ON public.estacionamientos;
-CREATE POLICY "estacionamientos_insert_anfitrion" ON public.estacionamientos
+DROP POLICY IF EXISTS "estacionamientos_insert_arrendador" ON public.estacionamientos;
+CREATE POLICY "estacionamientos_insert_arrendador" ON public.estacionamientos
   FOR INSERT WITH CHECK (
     auth.uid() = user_id
     AND EXISTS (
       SELECT 1 FROM public.perfiles
-      WHERE id = auth.uid() AND rol = 'anfitrion'
+      WHERE id = auth.uid() AND rol = 'arrendador'
     )
   );
 

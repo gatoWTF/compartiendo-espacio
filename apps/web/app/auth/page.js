@@ -18,7 +18,7 @@ const registerSchema = z.object({
   password: z.string().regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]).{8,}$/, {
     message: "Contraseña insegura: Mínimo 8 caracteres, incluye mayúscula, minúscula, número y símbolo."
   }),
-  rol: z.enum(['cliente', 'anfitrion'], { required_error: "Debes seleccionar un rol" })
+  rol: z.enum(['cliente', 'arrendador'], { required_error: "Debes seleccionar un rol" })
 });
 
 export default function AuthPage() {
@@ -137,9 +137,9 @@ export default function AuthPage() {
                       <input type="radio" value="cliente" {...register("rol")} />
                       <i className="fa-solid fa-car"></i> Conductor
                     </label>
-                    <label className={`role-option ${selectedRol === 'anfitrion' ? 'active' : ''}`}>
-                      <input type="radio" value="anfitrion" {...register("rol")} />
-                      <i className="fa-solid fa-square-parking"></i> Anfitrión
+                    <label className={`role-option ${selectedRol === 'arrendador' ? 'active' : ''}`}>
+                      <input type="radio" value="arrendador" {...register("rol")} />
+                      <i className="fa-solid fa-square-parking"></i> Arrendador
                     </label>
                   </div>
                   {errors.rol && <p className="error-msg">{errors.rol.message}</p>}

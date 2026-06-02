@@ -235,7 +235,7 @@ export default function DashboardPage() {
 
       <div className="dashboard-grid">
         {/* KPI METRICS */}
-        {session?.user?.rol === 'anfitrion' && myParkings.length > 0 && (
+        {session?.user?.rol === 'arrendador' && myParkings.length > 0 && (
           <div className="kpi-row">
             <div className="kpi-card">
               <div className="kpi-icon blue"><i className="fa-solid fa-warehouse"></i></div>
@@ -272,8 +272,8 @@ export default function DashboardPage() {
           </div>
         )}
         
-        {/* FORMULARIO NUEVO ESPACIO (Sólo Anfitriones) */}
-        {session?.user?.rol === 'anfitrion' && (
+        {/* FORMULARIO NUEVO ESPACIO (Sólo Arrendadores) */}
+        {session?.user?.rol === 'arrendador' && (
           <div className="glass-panel form-panel">
             <h3><i className="fa-solid fa-square-parking"></i> Publicar Estacionamiento</h3>
             <p className="panel-desc">Añade tu plaza a la red y comienza a generar ingresos con tu espacio disponible.</p>
@@ -328,13 +328,13 @@ export default function DashboardPage() {
         <div className="inventory-panel">
           <div className="inventory-header">
             <h3>
-              {session?.user?.rol === 'anfitrion' ? (
+              {session?.user?.rol === 'arrendador' ? (
                 <><i className="fa-solid fa-warehouse"></i> Mis Estacionamientos ({myParkings.length})</>
               ) : (
                 <><i className="fa-solid fa-car"></i> Mis Vehículos ({myParkings.length})</>
               )}
             </h3>
-            {myParkings.length > 0 && session?.user?.rol === 'anfitrion' && (
+            {myParkings.length > 0 && session?.user?.rol === 'arrendador' && (
               <div className="inventory-actions">
                 <button onClick={selectAll} className="btn-cyber-secondary action-btn">
                   {selectedIds.length === myParkings.length ? 'Desmarcar' : 'Seleccionar'}
@@ -350,7 +350,7 @@ export default function DashboardPage() {
 
           {myParkings.length === 0 ? (
             <div className="glass-panel empty-state">
-              {session?.user?.rol === 'anfitrion' ? (
+              {session?.user?.rol === 'arrendador' ? (
                 <>
                   <i className="fa-solid fa-square-parking"></i>
                   <p>Aún no tienes plazas publicadas. Añade tu primer estacionamiento para comenzar a recibir reservas.</p>

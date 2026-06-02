@@ -219,9 +219,9 @@ export default function ProfilePage() {
           <div className="role-badge" style={{
             padding: '8px 16px',
             borderRadius: '12px',
-            border: `1px solid ${perfil.rol === 'anfitrion' ? 'rgba(245, 158, 11, 0.3)' : 'rgba(59, 130, 246, 0.3)'}`,
-            background: perfil.rol === 'anfitrion' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(59, 130, 246, 0.1)',
-            color: perfil.rol === 'anfitrion' ? '#f59e0b' : '#60a5fa',
+            border: `1px solid ${perfil.rol === 'arrendador' ? 'rgba(245, 158, 11, 0.3)' : 'rgba(59, 130, 246, 0.3)'}`,
+            background: perfil.rol === 'arrendador' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+            color: perfil.rol === 'arrendador' ? '#f59e0b' : '#60a5fa',
             fontSize: '0.8rem',
             fontWeight: '800',
             letterSpacing: '1px',
@@ -230,8 +230,8 @@ export default function ProfilePage() {
             alignItems: 'center',
             gap: '8px'
           }}>
-            <i className={`fa-solid ${perfil.rol === 'anfitrion' ? 'fa-building' : 'fa-car'}`}></i>
-            {perfil.rol === 'anfitrion' ? 'ANFITRIÓN' : 'CONDUCTOR'}
+            <i className={`fa-solid ${perfil.rol === 'arrendador' ? 'fa-building' : 'fa-car'}`}></i>
+            {perfil.rol === 'arrendador' ? 'ARRENDADOR' : 'CONDUCTOR'}
           </div>
 
           <div className="nav-tabs">
@@ -268,10 +268,10 @@ export default function ProfilePage() {
                   </div>
                 </div>
                 <div className="info-card">
-                  <div className="info-card-icon role"><i className={`fa-solid ${perfil.rol === 'anfitrion' ? 'fa-building' : 'fa-car'}`}></i></div>
+                  <div className="info-card-icon role"><i className={`fa-solid ${perfil.rol === 'arrendador' ? 'fa-building' : 'fa-car'}`}></i></div>
                   <div className="info-card-data">
                     <span className="info-label">TIPO DE CUENTA</span>
-                    <span className="info-value">{perfil.rol === 'anfitrion' ? 'Anfitrión' : 'Conductor'}</span>
+                    <span className="info-value">{perfil.rol === 'arrendador' ? 'Arrendador' : 'Conductor'}</span>
                   </div>
                 </div>
                 <div className="info-card">
@@ -315,7 +315,7 @@ export default function ProfilePage() {
           {activeTab === 'vehiculos' && (
             <div className="tab-pane fade-in">
               <h2>Flota Registrada</h2>
-              <p className="subtitle-desc">El anfitrión necesita estos datos para autorizar tu ingreso.</p>
+              <p className="subtitle-desc">El arrendador necesita estos datos para autorizar tu ingreso.</p>
               
               <div className="vehicles-list">
                 {vehiculos.length === 0 ? (
