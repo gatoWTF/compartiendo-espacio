@@ -91,3 +91,32 @@ o a su historial. Severidad: **crítica**.
 - Pendientes de la hoja de ruta (búsqueda avanzada, historial, reservas
   profesionales, mensajería, perfiles, optimización) quedan para fases
   posteriores una vez resueltos los dos puntos críticos anteriores.
+
+---
+
+## 4. Divergencia de esquema — RESOLUCIÓN: alinear BD al código
+
+### Decisión
+Se añaden a la BD las columnas que el código espera (en lugar de reescribir el
+código). Mantiene la lógica de ocupación y de propiedad por anfitrión.
+
+### Migración
+Archivo: **`sql/005_align_estacionamientos.sql`** (idempotente).
+Añade `user_id`, `arrendador`, `total_spots`, `occupied_spots`; constraint de
+ocupación válida; índice por `user_id`; políticas RLS de escritura por
+propietario; y asegura la tabla en la publicación de Realtime.
+
+### Cómo aplicarla (acción tuya — no tengo acceso de escritura a la BD)
+1. Supabase → proyecto `obthriistwvcutjfrksh` → **SQL Editor**.
+2. Pegar y ejecutar el contenido de `sql/005_align_estacionamientos.sql`.
+3. Ejecutar las consultas de verificación del final del archivo.
+
+### Validación funcional post-migración
+- Iniciar sesión como anfitrión y crear un estacionamiento → debe responder 201.
+- `PATCH` de ocupación → debe responder 200 y propagarse por Realtime al mapa.
+- Las filas semilla existentes (id 1–5) tendrán `user_id = NULL`: son datos
+  públicos de demo; no serán editables por usuarios (correcto por RLS).
+
+### Riesgo
+Bajo: todas las operaciones son aditivas/idempotentes. No se borran ni alteran
+datos existentes. Las políticas usan `DROP POLICY IF EXISTS` antes de recrearse.
