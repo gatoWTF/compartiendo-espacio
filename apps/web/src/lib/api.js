@@ -8,6 +8,7 @@ import { supabase } from '@parkings/supabase-db';
 // ninguna variable NEXT_PUBLIC_MS_*_URL que pudiera quedar mal configurada.
 const MAPAS_URL = '/api/mapas';
 const RESERVAS_URL = '/api/reservas';
+const FAVORITOS_URL = '/api/favoritos';
 
 /**
  * Cabeceras con el JWT del usuario (si hay sesión), para que RLS evalúe
@@ -66,6 +67,15 @@ export const api = {
   mapas: {
     getMisEstacionamientos: (userId) =>
       fetchWithTimeout(`${MAPAS_URL}/search?userId=${userId}`),
+
+    // Búsqueda avanzada: filtros combinables (q, comuna, pmr, disponible,
+    // precioMax, lat/lng/radius). Devuelve { success, data }.
+    buscar: (filtros = {}) => {
+      const qs = new URLSearchParams(
+        Object.entries(filtros).filter(([, v]) => v !== undefined && v !== null && v !== '')
+      ).toString();
+      return fetchWithTimeout(`${MAPAS_URL}/search?${qs}`);
+    },
 
     crearEstacionamiento: async (data) =>
       fetchWithTimeout(`${MAPAS_URL}/search`, {
@@ -126,6 +136,38 @@ export const api = {
         method: 'PATCH',
         headers: await authHeaders(),
         body: JSON.stringify({ action: 'reprogramar', reserva_id, fecha_inicio, fecha_fin }),
+      }),
+
+    completar: async (reserva_id) =>
+      fetchWithTimeout(`${RESERVAS_URL}/manage`, {
+        method: 'PATCH',
+        headers: await authHeaders(),
+        body: JSON.stringify({ action: 'completar', reserva_id }),
+      }),
+
+    calificar: async (reserva_id, calificacion, comentario) =>
+      fetchWithTimeout(`${RESERVAS_URL}/manage`, {
+        method: 'PATCH',
+        headers: await authHeaders(),
+        body: JSON.stringify({ action: 'calificar', reserva_id, calificacion, comentario }),
+      }),
+  },
+  favoritos: {
+    listar: async () =>
+      fetchWithTimeout(`${FAVORITOS_URL}`, { headers: await authHeaders() }),
+
+    agregar: async (estacionamiento_id) =>
+      fetchWithTimeout(`${FAVORITOS_URL}`, {
+        method: 'POST',
+        headers: await authHeaders(),
+        body: JSON.stringify({ estacionamiento_id }),
+      }),
+
+    quitar: async (estacionamiento_id) =>
+      fetchWithTimeout(`${FAVORITOS_URL}`, {
+        method: 'DELETE',
+        headers: await authHeaders(),
+        body: JSON.stringify({ estacionamiento_id }),
       }),
   },
 };

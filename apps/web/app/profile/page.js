@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@parkings/supabase-db';
 import { toast, Toaster } from 'react-hot-toast';
+import { api } from '../../src/lib/api';
 
 export default function ProfilePage() {
   const [session, setSession] = useState(null);
@@ -15,8 +16,40 @@ export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState('personales'); // personales, vehiculos, pmr
   
   const [nuevoVehiculo, setNuevoVehiculo] = useState({ patente: '', marca: '', modelo: '', color: '' });
-  
+
+  const [reservas, setReservas] = useState([]);
+  const [loadingReservas, setLoadingReservas] = useState(false);
+
   const router = useRouter();
+
+  const cargarReservas = async () => {
+    setLoadingReservas(true);
+    const res = await api.reservas.listar('conductor');
+    if (res.success) setReservas(res.data || []);
+    setLoadingReservas(false);
+  };
+
+  useEffect(() => {
+    if (activeTab === 'reservas') cargarReservas();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  const handleCancelarReserva = async (id) => {
+    const res = await api.reservas.cancelar(id);
+    if (res.success) { toast.success('Reserva cancelada'); cargarReservas(); }
+    else toast.error(res.error || 'No se pudo cancelar');
+  };
+
+  const handleCalificarReserva = async (id) => {
+    const valor = parseInt(window.prompt('Califica tu experiencia (1 a 5):'), 10);
+    if (!valor || valor < 1 || valor > 5) { toast.error('Calificación inválida'); return; }
+    const comentario = window.prompt('Comentario (opcional):') || null;
+    const res = await api.reservas.calificar(id, valor, comentario);
+    if (res.success) { toast.success('¡Gracias por tu calificación!'); cargarReservas(); }
+    else toast.error(res.error || 'No se pudo calificar');
+  };
+
+  const fmtFecha = (f) => f ? new Date(f).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -241,6 +274,9 @@ export default function ProfilePage() {
             <button className={`tab-btn ${activeTab === 'vehiculos' ? 'active' : ''}`} onClick={() => setActiveTab('vehiculos')}>
               <i className="fa-solid fa-car"></i> Mis Vehículos ({vehiculos.length})
             </button>
+            <button className={`tab-btn ${activeTab === 'reservas' ? 'active' : ''}`} onClick={() => setActiveTab('reservas')}>
+              <i className="fa-solid fa-calendar-check"></i> Mis Reservas
+            </button>
             <button className={`tab-btn ${activeTab === 'pmr' ? 'active' : ''}`} onClick={() => setActiveTab('pmr')}>
               <i className="fa-solid fa-wheelchair"></i> Accesibilidad
             </button>
@@ -354,6 +390,47 @@ export default function ProfilePage() {
                   {saving ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-plus"></i>} Agregar
                 </button>
               </form>
+            </div>
+          )}
+
+          {activeTab === 'reservas' && (
+            <div className="tab-pane fade-in">
+              <h2>Mis Reservas</h2>
+              <p className="subtitle-desc">Historial y reservas activas. Califica las completadas y gestiona las próximas.</p>
+
+              {loadingReservas ? (
+                <div className="empty-state"><i className="fa-solid fa-spinner fa-spin"></i> Cargando reservas…</div>
+              ) : reservas.length === 0 ? (
+                <div className="empty-state">Aún no tienes reservas. Encuentra un estacionamiento en el mapa.</div>
+              ) : (
+                <div className="vehicles-list">
+                  {reservas.map(r => (
+                    <div key={r.id} className="vehicle-card reserva-card">
+                      <div className="v-details" style={{ marginLeft: 0 }}>
+                        <strong>{r.estacionamiento?.nombre || 'Estacionamiento'}</strong>
+                        <span>{r.estacionamiento?.comuna ? `${r.estacionamiento.comuna} · ` : ''}{fmtFecha(r.fecha_inicio)} → {fmtFecha(r.fecha_fin)}</span>
+                        <span>
+                          {r.precio_total != null && <>💲 ${Number(r.precio_total).toLocaleString('es-CL')} · </>}
+                          <span className={`estado-badge estado-${r.estado}`}>{r.estado}</span>
+                          {r.calificacion ? <> · {'★'.repeat(r.calificacion)}</> : null}
+                        </span>
+                      </div>
+                      <div className="reserva-actions">
+                        {(r.estado === 'pendiente' || r.estado === 'confirmada') && (
+                          <button onClick={() => handleCancelarReserva(r.id)} className="btn-icon-danger" title="Cancelar">
+                            <i className="fa-solid fa-ban"></i>
+                          </button>
+                        )}
+                        {r.estado === 'completada' && !r.calificacion && (
+                          <button onClick={() => handleCalificarReserva(r.id)} className="btn-cyber-secondary" style={{ padding: '8px 14px' }}>
+                            <i className="fa-solid fa-star"></i> Calificar
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -471,6 +548,16 @@ export default function ProfilePage() {
         .toggle-switch label:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
         .toggle-switch input:checked + label { background-color: #10b981; box-shadow: 0 0 15px rgba(16, 185, 129, 0.5); }
         .toggle-switch input:checked + label:before { transform: translateX(26px); }
+
+        /* Reservas */
+        .reserva-card { gap: 15px; }
+        .reserva-actions { display: flex; align-items: center; gap: 10px; }
+        .estado-badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; }
+        .estado-pendiente { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+        .estado-confirmada { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+        .estado-activa { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+        .estado-completada { background: rgba(148, 163, 184, 0.15); color: #94a3b8; }
+        .estado-cancelada { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
 
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }

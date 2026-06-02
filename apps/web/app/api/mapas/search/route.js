@@ -44,8 +44,19 @@ export async function GET(request) {
     const lng = parseFloat(searchParams.get('lng'));
     const radius = parseFloat(searchParams.get('radius'));
 
+    // Filtros de BÚSQUEDA AVANZADA (todos opcionales y combinables).
+    const q = searchParams.get('q');                    // texto libre sobre nombre
+    const comuna = searchParams.get('comuna');           // comuna (case-insensitive)
+    const pmr = searchParams.get('pmr');                 // 'true' → solo plazas PMR
+    const disponible = searchParams.get('disponible');   // 'true' → con cupo libre
+    const precioMax = parseFloat(searchParams.get('precioMax'));
+
     let query = supabase.from('estacionamientos').select('*');
     if (userId) query = query.eq('user_id', userId);
+    if (q) query = query.ilike('nombre', `%${q}%`);
+    if (comuna) query = query.ilike('comuna', comuna);
+    if (pmr === 'true') query = query.eq('es_pmr', true);
+    if (!Number.isNaN(precioMax)) query = query.lte('precio_hora', precioMax);
 
     const { data, error } = await query;
     if (error) {
@@ -53,6 +64,13 @@ export async function GET(request) {
     }
 
     let result = data || [];
+
+    // Disponibilidad: requiere columnas total_spots/occupied_spots (migración 005).
+    if (disponible === 'true') {
+      result = result.filter(
+        (p) => p.total_spots == null || Number(p.occupied_spots ?? 0) < Number(p.total_spots)
+      );
+    }
 
     // Filtro geográfico opcional (solo si se entregan lat/lng/radius válidos y radius < 9999).
     if (!Number.isNaN(lat) && !Number.isNaN(lng) && !Number.isNaN(radius) && radius > 0 && radius < 9999) {

@@ -54,7 +54,7 @@ export async function PATCH(request) {
     const token = getToken(request);
     if (!token) return NextResponse.json({ success: false, error: 'No autenticado.' }, { status: 401 });
 
-    const { action, reserva_id, fecha_inicio, fecha_fin } = await request.json();
+    const { action, reserva_id, fecha_inicio, fecha_fin, calificacion, comentario } = await request.json();
     if (!action || !reserva_id) {
       return NextResponse.json({ success: false, error: 'Faltan action o reserva_id.' }, { status: 400 });
     }
@@ -68,6 +68,19 @@ export async function PATCH(request) {
         break;
       case 'cancelar':
         result = await db.rpc('cancelar_reserva_pro', { p_reserva_id: reserva_id });
+        break;
+      case 'completar':
+        result = await db.rpc('completar_reserva', { p_reserva_id: reserva_id });
+        break;
+      case 'calificar':
+        if (!calificacion) {
+          return NextResponse.json({ success: false, error: 'Calificar requiere calificacion (1-5).' }, { status: 400 });
+        }
+        result = await db.rpc('calificar_reserva', {
+          p_reserva_id: reserva_id,
+          p_calificacion: calificacion,
+          p_comentario: comentario ?? null,
+        });
         break;
       case 'reprogramar':
         if (!fecha_inicio || !fecha_fin) {
