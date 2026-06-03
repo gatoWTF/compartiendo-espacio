@@ -30,7 +30,7 @@ async function authHeaders() {
  * Límite estricto de 8 segundos. Si falla, retorna Fallback seguro
  * pero preservando el mensaje real del backend para no ocultar el error.
  */
-async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
+async function fetchWithTimeout(url, options = {}, timeoutMs = 4000) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeoutMs);
 
