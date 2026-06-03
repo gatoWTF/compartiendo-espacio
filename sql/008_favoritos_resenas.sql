@@ -1,68 +1,41 @@
--- 008_favoritos_resenas.sql  (v2 — compatible con id integer O uuid)
+-- 008_favoritos_resenas.sql  (v3)
 -- Favoritos + Calificaciones/Reseñas.
--- Detecta en runtime el tipo real de estacionamientos.id y lo replica
--- en favoritos.estacionamiento_id para que el FK siempre sea compatible.
+-- CORRECCIÓN: estacionamientos.id en producción es INTEGER (no uuid).
+-- Se hace DROP TABLE IF EXISTS porque la tabla aún no tiene datos de producción.
 -- Idempotente. Ejecutar DESPUÉS de 005/006/007.
 
 BEGIN;
 
 -- ============================================================================
--- 0) Averiguar el tipo real de estacionamientos.id (integer en producción)
+-- 1) FAVORITOS
 -- ============================================================================
-DO $$
-DECLARE
-  v_id_type text;
-  v_ddl     text;
-BEGIN
-  SELECT data_type INTO v_id_type
-  FROM information_schema.columns
-  WHERE table_schema = 'public'
-    AND table_name   = 'estacionamientos'
-    AND column_name  = 'id';
 
-  -- Sólo crear la tabla si no existe todavía
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.tables
-    WHERE table_schema = 'public' AND table_name = 'favoritos'
-  ) THEN
-    -- Construir DDL dinámico con el tipo correcto para la FK
-    v_ddl := format(
-      $sql$
-        CREATE TABLE public.favoritos (
-          id                  uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-          user_id             uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-          estacionamiento_id  %s  NOT NULL REFERENCES public.estacionamientos(id) ON DELETE CASCADE,
-          created_at          timestamptz NOT NULL DEFAULT now(),
-          UNIQUE (user_id, estacionamiento_id)
-        );
-      $sql$,
-      v_id_type
-    );
-    EXECUTE v_ddl;
-    RAISE NOTICE 'Tabla favoritos creada con estacionamiento_id de tipo %', v_id_type;
-  ELSE
-    RAISE NOTICE 'Tabla favoritos ya existe — se omite la creación.';
-  END IF;
-END $$;
+-- Borramos si quedó creada con el tipo incorrecto (sin datos, es seguro).
+DROP TABLE IF EXISTS public.favoritos;
 
-CREATE INDEX IF NOT EXISTS idx_favoritos_user ON public.favoritos (user_id);
+CREATE TABLE public.favoritos (
+  id                 uuid    DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id            uuid    NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  estacionamiento_id integer NOT NULL REFERENCES public.estacionamientos(id) ON DELETE CASCADE,
+  created_at         timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id, estacionamiento_id)
+);
+
+CREATE INDEX idx_favoritos_user ON public.favoritos (user_id);
 
 ALTER TABLE public.favoritos ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "favoritos_select_own" ON public.favoritos;
 CREATE POLICY "favoritos_select_own" ON public.favoritos
   FOR SELECT USING (auth.uid() = user_id);
 
-DROP POLICY IF EXISTS "favoritos_insert_own" ON public.favoritos;
 CREATE POLICY "favoritos_insert_own" ON public.favoritos
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
-DROP POLICY IF EXISTS "favoritos_delete_own" ON public.favoritos;
 CREATE POLICY "favoritos_delete_own" ON public.favoritos
   FOR DELETE USING (auth.uid() = user_id);
 
 -- ============================================================================
--- 1) CALIFICACIONES / RESEÑAS  (sobre una reserva ya completada)
+-- 2) CALIFICACIONES / RESEÑAS
 -- ============================================================================
 ALTER TABLE public.reservas
   ADD COLUMN IF NOT EXISTS calificacion   int,
@@ -74,26 +47,26 @@ ALTER TABLE public.reservas
   ADD CONSTRAINT reservas_calificacion_rango
   CHECK (calificacion IS NULL OR calificacion BETWEEN 1 AND 5);
 
--- Columnas de agregado en estacionamientos (en prod ya existen → idempotente).
+-- Columnas de agregado (en prod ya existen → idempotente).
 ALTER TABLE public.estacionamientos
   ADD COLUMN IF NOT EXISTS rating        numeric DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS reviews_count int     DEFAULT 0;
+  ADD COLUMN IF NOT EXISTS reviews_count integer DEFAULT 0;
 
 -- ============================================================================
--- 2) RPC: calificar una reserva propia y recomputar rating del estacionamiento
+-- 3) RPC: calificar reserva propia + recalcular rating del estacionamiento
 -- ============================================================================
 CREATE OR REPLACE FUNCTION public.calificar_reserva(
   p_reserva_id   uuid,
-  p_calificacion int,
+  p_calificacion integer,
   p_comentario   text DEFAULT NULL
 )
 RETURNS public.reservas
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
-  v_uid    uuid := auth.uid();
+  v_uid     uuid := auth.uid();
   v_reserva public.reservas%ROWTYPE;
-  v_avg    numeric;
-  v_cnt    int;
+  v_avg     numeric;
+  v_cnt     integer;
 BEGIN
   IF v_uid IS NULL THEN RAISE EXCEPTION 'No autenticado'; END IF;
   IF p_calificacion < 1 OR p_calificacion > 5 THEN
@@ -130,19 +103,19 @@ BEGIN
   RETURN v_reserva;
 END; $$;
 
-REVOKE ALL ON FUNCTION public.calificar_reserva(uuid,int,text) FROM public, anon;
-GRANT EXECUTE ON FUNCTION public.calificar_reserva(uuid,int,text) TO authenticated;
+REVOKE ALL ON FUNCTION public.calificar_reserva(uuid,integer,text) FROM public, anon;
+GRANT EXECUTE ON FUNCTION public.calificar_reserva(uuid,integer,text) TO authenticated;
 
 -- ============================================================================
--- 3) RPC: completar una reserva (arrendador del espacio o el propio conductor)
+-- 4) RPC: completar reserva (arrendador o conductor)
 -- ============================================================================
 CREATE OR REPLACE FUNCTION public.completar_reserva(p_reserva_id uuid)
 RETURNS public.reservas
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
-  v_uid    uuid := auth.uid();
+  v_uid     uuid := auth.uid();
   v_reserva public.reservas%ROWTYPE;
-  v_owner  uuid;
+  v_owner   uuid;
 BEGIN
   IF v_uid IS NULL THEN RAISE EXCEPTION 'No autenticado'; END IF;
 
@@ -170,8 +143,3 @@ REVOKE ALL ON FUNCTION public.completar_reserva(uuid) FROM public, anon;
 GRANT EXECUTE ON FUNCTION public.completar_reserva(uuid) TO authenticated;
 
 COMMIT;
-
--- Verificación (ejecutar por separado):
--- SELECT column_name, data_type FROM information_schema.columns
---   WHERE table_schema='public' AND table_name='favoritos';
--- SELECT id, estado, calificacion FROM public.reservas LIMIT 5;

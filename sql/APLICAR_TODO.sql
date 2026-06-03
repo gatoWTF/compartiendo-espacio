@@ -1,13 +1,199 @@
 -- ==================================================================
--- APLICAR_TODO.sql (v2) — Ejecuta en orden 005 → 006 → 007 → 008
--- Pegar completo en Supabase SQL Editor. Todas las migraciones son
--- idempotentes. 008 detecta el tipo real de estacionamientos.id
--- para crear favoritos.estacionamiento_id con el tipo compatible.
+-- APLICAR_TODO.sql (v3) — Ejecutar completo en Supabase SQL Editor
+-- Orden: 004 → 005 → 006 → 007 → 008
+-- Todas las migraciones son idempotentes (re-ejecutables).
+-- CORRECCIÓN v3: estacionamientos.id es INTEGER en producción.
 -- ==================================================================
 
--- ╔═══════════════════════════════════════════════════════╗
--- ║  005_align_estacionamientos.sql
--- ╚═══════════════════════════════════════════════════════╝
+-- ╔══════════════════════════════════════════╗
+-- ╚══════════════════════════════════════════╝
+-- ╔══════════════════════════════════════════════════════════════╗
+-- ║  PARKINGS TOGETHER — 004 Endurecimiento de Seguridad + RLS    ║
+-- ║  Idempotente. Ejecutar en: Supabase Dashboard > SQL Editor    ║
+-- ╚══════════════════════════════════════════════════════════════╝
+-- Corrige:
+--   A) Reserva rota por RLS (conductor no puede incrementar ocupacion).
+--   B) Falta de policies UPDATE/DELETE en reservas (cancelar/completar).
+--   C) Sin constraint de ocupacion (occupied entre 0 y total).
+--   E) Perfil no creado de forma fiable en el registro.
+--   Realtime: asegurar publicacion de estacionamientos.
+
+-- ───────────────────────────────────────────────────────────────
+-- C) Constraint de ocupacion (NOT VALID para no bloquear filas previas)
+-- ───────────────────────────────────────────────────────────────
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'estacionamientos_ocupacion_valida'
+  ) THEN
+    ALTER TABLE public.estacionamientos
+      ADD CONSTRAINT estacionamientos_ocupacion_valida
+      CHECK (occupied_spots >= 0 AND occupied_spots <= total_spots) NOT VALID;
+  END IF;
+END$$;
+
+-- ───────────────────────────────────────────────────────────────
+-- B) Policies UPDATE/DELETE para reservas
+-- ───────────────────────────────────────────────────────────────
+-- Conductor puede actualizar (p.ej. cancelar) sus propias reservas
+DROP POLICY IF EXISTS "reservas_update_conductor" ON public.reservas;
+CREATE POLICY "reservas_update_conductor" ON public.reservas
+  FOR UPDATE USING (auth.uid() = conductor_id)
+  WITH CHECK (auth.uid() = conductor_id);
+
+-- Anfitrion puede actualizar (p.ej. completar) reservas de sus estacionamientos
+DROP POLICY IF EXISTS "reservas_update_anfitrion" ON public.reservas;
+CREATE POLICY "reservas_update_anfitrion" ON public.reservas
+  FOR UPDATE USING (
+    EXISTS (
+      SELECT 1 FROM public.estacionamientos e
+      WHERE e.id = reservas.estacionamiento_id AND e.user_id = auth.uid()
+    )
+  );
+
+-- Conductor puede eliminar sus reservas (opcional; preferir estado 'cancelada')
+DROP POLICY IF EXISTS "reservas_delete_conductor" ON public.reservas;
+CREATE POLICY "reservas_delete_conductor" ON public.reservas
+  FOR DELETE USING (auth.uid() = conductor_id);
+
+-- ───────────────────────────────────────────────────────────────
+-- E) Trigger para crear el perfil automaticamente al registrarse
+--    Evita que el perfil falle si la confirmacion por email esta activa.
+-- ───────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  INSERT INTO public.perfiles (id, nombre, rol)
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.raw_user_meta_data->>'nombre', split_part(NEW.email, '@', 1)),
+    COALESCE(NEW.raw_user_meta_data->>'rol', 'cliente')
+  )
+  ON CONFLICT (id) DO NOTHING;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- ───────────────────────────────────────────────────────────────
+-- A) RPC atomica de reserva (resuelve autorizacion + doble reserva)
+--    SECURITY DEFINER: ejecuta con privilegios controlados, pero
+--    valida internamente que el conductor es el auth.uid() actual.
+-- ───────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.reservar_estacionamiento(p_estacionamiento_id integer)
+RETURNS public.reservas
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_uid uuid := auth.uid();
+  v_parking public.estacionamientos%ROWTYPE;
+  v_reserva public.reservas%ROWTYPE;
+BEGIN
+  IF v_uid IS NULL THEN
+    RAISE EXCEPTION 'No autenticado';
+  END IF;
+
+  -- Bloqueo de fila para evitar doble reserva concurrente
+  SELECT * INTO v_parking
+  FROM public.estacionamientos
+  WHERE id = p_estacionamiento_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Estacionamiento no encontrado';
+  END IF;
+
+  IF v_parking.occupied_spots >= v_parking.total_spots THEN
+    RAISE EXCEPTION 'Estacionamiento lleno';
+  END IF;
+
+  INSERT INTO public.reservas (estacionamiento_id, conductor_id, estado)
+  VALUES (p_estacionamiento_id, v_uid, 'activa')
+  RETURNING * INTO v_reserva;
+
+  UPDATE public.estacionamientos
+  SET occupied_spots = occupied_spots + 1
+  WHERE id = p_estacionamiento_id;
+
+  RETURN v_reserva;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.reservar_estacionamiento(integer) FROM public, anon;
+GRANT EXECUTE ON FUNCTION public.reservar_estacionamiento(integer) TO authenticated;
+
+-- ───────────────────────────────────────────────────────────────
+-- A.2) RPC para cancelar una reserva activa y liberar el cupo
+-- ───────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.cancelar_reserva(p_reserva_id uuid)
+RETURNS public.reservas
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_uid uuid := auth.uid();
+  v_reserva public.reservas%ROWTYPE;
+BEGIN
+  IF v_uid IS NULL THEN
+    RAISE EXCEPTION 'No autenticado';
+  END IF;
+
+  SELECT * INTO v_reserva FROM public.reservas
+  WHERE id = p_reserva_id FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Reserva no encontrada';
+  END IF;
+
+  -- Solo el conductor dueño de la reserva puede cancelarla
+  IF v_reserva.conductor_id <> v_uid THEN
+    RAISE EXCEPTION 'No autorizado para cancelar esta reserva';
+  END IF;
+
+  IF v_reserva.estado <> 'activa' THEN
+    RAISE EXCEPTION 'La reserva no esta activa';
+  END IF;
+
+  UPDATE public.reservas SET estado = 'cancelada' WHERE id = p_reserva_id
+  RETURNING * INTO v_reserva;
+
+  UPDATE public.estacionamientos
+  SET occupied_spots = GREATEST(occupied_spots - 1, 0)
+  WHERE id = v_reserva.estacionamiento_id;
+
+  RETURN v_reserva;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.cancelar_reserva(uuid) FROM public, anon;
+GRANT EXECUTE ON FUNCTION public.cancelar_reserva(uuid) TO authenticated;
+
+-- ───────────────────────────────────────────────────────────────
+-- Realtime: asegurar que estacionamientos emite cambios
+-- ───────────────────────────────────────────────────────────────
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND tablename = 'estacionamientos'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.estacionamientos;
+  END IF;
+END$$;
+
+-- ╔══════════════════════════════════════════╗
+-- ╚══════════════════════════════════════════╝
 -- 005_align_estacionamientos.sql
 -- Objetivo: alinear la tabla `public.estacionamientos` de PRODUCCIÓN con lo que
 -- el código de apps/web espera (POST/PATCH en app/api/mapas/search/route.js).
@@ -100,9 +286,8 @@ COMMIT;
 -- SELECT polname, cmd FROM pg_policies
 --  WHERE schemaname = 'public' AND tablename = 'estacionamientos';
 
--- ╔═══════════════════════════════════════════════════════╗
--- ║  006_rename_rol_arrendador.sql
--- ╚═══════════════════════════════════════════════════════╝
+-- ╔══════════════════════════════════════════╗
+-- ╚══════════════════════════════════════════╝
 -- 006_rename_rol_arrendador.sql
 -- Renombra el rol 'anfitrion' -> 'arrendador' en todo el sistema.
 -- Idempotente. Ejecutar en: Supabase → SQL Editor.
@@ -148,9 +333,8 @@ COMMIT;
 -- SELECT conname, pg_get_constraintdef(oid) FROM pg_constraint
 --   WHERE conrelid = 'public.perfiles'::regclass AND conname = 'perfiles_rol_check';
 
--- ╔═══════════════════════════════════════════════════════╗
--- ║  007_reservas_pro.sql
--- ╚═══════════════════════════════════════════════════════╝
+-- ╔══════════════════════════════════════════╗
+-- ╚══════════════════════════════════════════╝
 -- 007_reservas_pro.sql
 -- Sistema de RESERVAS PROFESIONALES (reserva anticipada por ventana de tiempo).
 -- Idempotente. Ejecutar en Supabase → SQL Editor DESPUÉS de 004/005/006.
@@ -201,7 +385,7 @@ CREATE TRIGGER trg_reservas_updated_at
 
 -- 2) RPC: crear reserva profesional ------------------------------------------
 CREATE OR REPLACE FUNCTION public.crear_reserva_pro(
-  p_estacionamiento_id uuid,
+  p_estacionamiento_id integer,
   p_fecha_inicio timestamptz,
   p_fecha_fin timestamptz
 )
@@ -255,8 +439,8 @@ BEGIN
   RETURN v_reserva;
 END; $$;
 
-REVOKE ALL ON FUNCTION public.crear_reserva_pro(uuid,timestamptz,timestamptz) FROM public, anon;
-GRANT EXECUTE ON FUNCTION public.crear_reserva_pro(uuid,timestamptz,timestamptz) TO authenticated;
+REVOKE ALL ON FUNCTION public.crear_reserva_pro(integer,timestamptz,timestamptz) FROM public, anon;
+GRANT EXECUTE ON FUNCTION public.crear_reserva_pro(integer,timestamptz,timestamptz) TO authenticated;
 
 -- 3) RPC: confirmar (solo el arrendador dueño del estacionamiento) ------------
 CREATE OR REPLACE FUNCTION public.confirmar_reserva(p_reserva_id uuid)
@@ -383,74 +567,46 @@ COMMIT;
 -- SELECT column_name FROM information_schema.columns
 --  WHERE table_schema='public' AND table_name='reservas' ORDER BY ordinal_position;
 
--- ╔═══════════════════════════════════════════════════════╗
--- ║  008_favoritos_resenas.sql
--- ╚═══════════════════════════════════════════════════════╝
--- 008_favoritos_resenas.sql  (v2 — compatible con id integer O uuid)
+-- ╔══════════════════════════════════════════╗
+-- ╚══════════════════════════════════════════╝
+-- 008_favoritos_resenas.sql  (v3)
 -- Favoritos + Calificaciones/Reseñas.
--- Detecta en runtime el tipo real de estacionamientos.id y lo replica
--- en favoritos.estacionamiento_id para que el FK siempre sea compatible.
+-- CORRECCIÓN: estacionamientos.id en producción es INTEGER (no uuid).
+-- Se hace DROP TABLE IF EXISTS porque la tabla aún no tiene datos de producción.
 -- Idempotente. Ejecutar DESPUÉS de 005/006/007.
 
 BEGIN;
 
 -- ============================================================================
--- 0) Averiguar el tipo real de estacionamientos.id (integer en producción)
+-- 1) FAVORITOS
 -- ============================================================================
-DO $$
-DECLARE
-  v_id_type text;
-  v_ddl     text;
-BEGIN
-  SELECT data_type INTO v_id_type
-  FROM information_schema.columns
-  WHERE table_schema = 'public'
-    AND table_name   = 'estacionamientos'
-    AND column_name  = 'id';
 
-  -- Sólo crear la tabla si no existe todavía
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.tables
-    WHERE table_schema = 'public' AND table_name = 'favoritos'
-  ) THEN
-    -- Construir DDL dinámico con el tipo correcto para la FK
-    v_ddl := format(
-      $sql$
-        CREATE TABLE public.favoritos (
-          id                  uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-          user_id             uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-          estacionamiento_id  %s  NOT NULL REFERENCES public.estacionamientos(id) ON DELETE CASCADE,
-          created_at          timestamptz NOT NULL DEFAULT now(),
-          UNIQUE (user_id, estacionamiento_id)
-        );
-      $sql$,
-      v_id_type
-    );
-    EXECUTE v_ddl;
-    RAISE NOTICE 'Tabla favoritos creada con estacionamiento_id de tipo %', v_id_type;
-  ELSE
-    RAISE NOTICE 'Tabla favoritos ya existe — se omite la creación.';
-  END IF;
-END $$;
+-- Borramos si quedó creada con el tipo incorrecto (sin datos, es seguro).
+DROP TABLE IF EXISTS public.favoritos;
 
-CREATE INDEX IF NOT EXISTS idx_favoritos_user ON public.favoritos (user_id);
+CREATE TABLE public.favoritos (
+  id                 uuid    DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id            uuid    NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  estacionamiento_id integer NOT NULL REFERENCES public.estacionamientos(id) ON DELETE CASCADE,
+  created_at         timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id, estacionamiento_id)
+);
+
+CREATE INDEX idx_favoritos_user ON public.favoritos (user_id);
 
 ALTER TABLE public.favoritos ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "favoritos_select_own" ON public.favoritos;
 CREATE POLICY "favoritos_select_own" ON public.favoritos
   FOR SELECT USING (auth.uid() = user_id);
 
-DROP POLICY IF EXISTS "favoritos_insert_own" ON public.favoritos;
 CREATE POLICY "favoritos_insert_own" ON public.favoritos
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
-DROP POLICY IF EXISTS "favoritos_delete_own" ON public.favoritos;
 CREATE POLICY "favoritos_delete_own" ON public.favoritos
   FOR DELETE USING (auth.uid() = user_id);
 
 -- ============================================================================
--- 1) CALIFICACIONES / RESEÑAS  (sobre una reserva ya completada)
+-- 2) CALIFICACIONES / RESEÑAS
 -- ============================================================================
 ALTER TABLE public.reservas
   ADD COLUMN IF NOT EXISTS calificacion   int,
@@ -462,26 +618,26 @@ ALTER TABLE public.reservas
   ADD CONSTRAINT reservas_calificacion_rango
   CHECK (calificacion IS NULL OR calificacion BETWEEN 1 AND 5);
 
--- Columnas de agregado en estacionamientos (en prod ya existen → idempotente).
+-- Columnas de agregado (en prod ya existen → idempotente).
 ALTER TABLE public.estacionamientos
   ADD COLUMN IF NOT EXISTS rating        numeric DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS reviews_count int     DEFAULT 0;
+  ADD COLUMN IF NOT EXISTS reviews_count integer DEFAULT 0;
 
 -- ============================================================================
--- 2) RPC: calificar una reserva propia y recomputar rating del estacionamiento
+-- 3) RPC: calificar reserva propia + recalcular rating del estacionamiento
 -- ============================================================================
 CREATE OR REPLACE FUNCTION public.calificar_reserva(
   p_reserva_id   uuid,
-  p_calificacion int,
+  p_calificacion integer,
   p_comentario   text DEFAULT NULL
 )
 RETURNS public.reservas
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
-  v_uid    uuid := auth.uid();
+  v_uid     uuid := auth.uid();
   v_reserva public.reservas%ROWTYPE;
-  v_avg    numeric;
-  v_cnt    int;
+  v_avg     numeric;
+  v_cnt     integer;
 BEGIN
   IF v_uid IS NULL THEN RAISE EXCEPTION 'No autenticado'; END IF;
   IF p_calificacion < 1 OR p_calificacion > 5 THEN
@@ -518,19 +674,19 @@ BEGIN
   RETURN v_reserva;
 END; $$;
 
-REVOKE ALL ON FUNCTION public.calificar_reserva(uuid,int,text) FROM public, anon;
-GRANT EXECUTE ON FUNCTION public.calificar_reserva(uuid,int,text) TO authenticated;
+REVOKE ALL ON FUNCTION public.calificar_reserva(uuid,integer,text) FROM public, anon;
+GRANT EXECUTE ON FUNCTION public.calificar_reserva(uuid,integer,text) TO authenticated;
 
 -- ============================================================================
--- 3) RPC: completar una reserva (arrendador del espacio o el propio conductor)
+-- 4) RPC: completar reserva (arrendador o conductor)
 -- ============================================================================
 CREATE OR REPLACE FUNCTION public.completar_reserva(p_reserva_id uuid)
 RETURNS public.reservas
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
-  v_uid    uuid := auth.uid();
+  v_uid     uuid := auth.uid();
   v_reserva public.reservas%ROWTYPE;
-  v_owner  uuid;
+  v_owner   uuid;
 BEGIN
   IF v_uid IS NULL THEN RAISE EXCEPTION 'No autenticado'; END IF;
 
@@ -558,8 +714,3 @@ REVOKE ALL ON FUNCTION public.completar_reserva(uuid) FROM public, anon;
 GRANT EXECUTE ON FUNCTION public.completar_reserva(uuid) TO authenticated;
 
 COMMIT;
-
--- Verificación (ejecutar por separado):
--- SELECT column_name, data_type FROM information_schema.columns
---   WHERE table_schema='public' AND table_name='favoritos';
--- SELECT id, estado, calificacion FROM public.reservas LIMIT 5;

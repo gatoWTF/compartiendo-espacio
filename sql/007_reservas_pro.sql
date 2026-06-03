@@ -48,7 +48,7 @@ CREATE TRIGGER trg_reservas_updated_at
 
 -- 2) RPC: crear reserva profesional ------------------------------------------
 CREATE OR REPLACE FUNCTION public.crear_reserva_pro(
-  p_estacionamiento_id uuid,
+  p_estacionamiento_id integer,
   p_fecha_inicio timestamptz,
   p_fecha_fin timestamptz
 )
@@ -102,8 +102,8 @@ BEGIN
   RETURN v_reserva;
 END; $$;
 
-REVOKE ALL ON FUNCTION public.crear_reserva_pro(uuid,timestamptz,timestamptz) FROM public, anon;
-GRANT EXECUTE ON FUNCTION public.crear_reserva_pro(uuid,timestamptz,timestamptz) TO authenticated;
+REVOKE ALL ON FUNCTION public.crear_reserva_pro(integer,timestamptz,timestamptz) FROM public, anon;
+GRANT EXECUTE ON FUNCTION public.crear_reserva_pro(integer,timestamptz,timestamptz) TO authenticated;
 
 -- 3) RPC: confirmar (solo el arrendador dueño del estacionamiento) ------------
 CREATE OR REPLACE FUNCTION public.confirmar_reserva(p_reserva_id uuid)

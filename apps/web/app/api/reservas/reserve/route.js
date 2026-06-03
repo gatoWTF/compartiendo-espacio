@@ -72,15 +72,17 @@ export async function POST(request) {
     //  - INSTANTÁNEA (legacy): sin fechas, ocupa un cupo ahora e incrementa
     //    occupied_spots. Se conserva para el flujo de "estacionar ya".
     let reserva, error;
+    // estacionamientos.id es integer en producción — coercionar explícitamente
+    const estId = Number(parking_id);
     if (fecha_inicio && fecha_fin) {
       ({ data: reserva, error } = await db.rpc('crear_reserva_pro', {
-        p_estacionamiento_id: parking_id,
+        p_estacionamiento_id: estId,
         p_fecha_inicio: fecha_inicio,
         p_fecha_fin: fecha_fin,
       }));
     } else {
       ({ data: reserva, error } = await db.rpc('reservar_estacionamiento', {
-        p_estacionamiento_id: parking_id,
+        p_estacionamiento_id: estId,
       }));
     }
 
