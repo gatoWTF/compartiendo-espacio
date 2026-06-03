@@ -6,13 +6,14 @@ import { supabase } from '@parkings/supabase-db';
 import { toast } from 'react-hot-toast';
 
 export function useMapRadar() {
-  const { location: userLoc, locationSource, isLoading: isLocating, error: locError, userProfile } = useGeolocation();
+  const { location: gpsLoc, locationSource, isLoading: isLocating, error: locError, userProfile } = useGeolocation();
+  const [locOverride, setLocOverride] = useState(null);
+  const userLoc = locOverride || gpsLoc;
   const [parkings, setParkings] = useState([]);
   const [radius, setRadius] = useState(5);
   const [sortOption, setSortOption] = useState('cercania');
   const [selectedSpot, setSelectedSpot] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isCloud, setIsCloud] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const [isReserving, setIsReserving] = useState(false);
@@ -24,14 +25,7 @@ export function useMapRadar() {
 
   const fetchRadar = async (r, lat, lng) => {
     try {
-      // Siempre mismo origen (/api/mapas). Funciona en Vercel sin microservicios
-      // externos ni CORS, de forma determinista (sin depender de env vars).
-      const URL = '/api/mapas';
-      if (typeof window !== 'undefined' && window.location.hostname.includes('vercel')) {
-        setIsCloud(true);
-      }
-
-      const res = await fetch(`${URL}/search?radius=${r}&lat=${lat}&lng=${lng}`, { cache: 'no-store' });
+      const res = await fetch(`/api/mapas/search?radius=${r}&lat=${lat}&lng=${lng}`, { cache: 'no-store' });
       const data = await res.json();
       return data.success ? data.data : [];
     } catch (e) { return []; }
@@ -163,7 +157,7 @@ export function useMapRadar() {
   };
 
   return {
-    state: { userLoc, locationSource, parkings, radius, sortOption, selectedSpot, loading, isCloud, mobileMenuOpen, isReserving, reserveStep, reserveError, userProfile, tempLocks },
-    actions: { setRadius, setSortOption, setSelectedSpot, setMobileMenuOpen, handleReserve, setParkingsOverride: setParkings }
+    state: { userLoc, locationSource, parkings, radius, sortOption, selectedSpot, loading, mobileMenuOpen, isReserving, reserveStep, reserveError, userProfile, tempLocks },
+    actions: { setRadius, setSortOption, setSelectedSpot, setMobileMenuOpen, handleReserve, setParkingsOverride: setParkings, setLocationOverride: setLocOverride }
   };
 }

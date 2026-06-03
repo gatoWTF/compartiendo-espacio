@@ -297,6 +297,8 @@ export async function DELETE(request) {
       success: true,
       hardDeleted: hardDelete.length,
       softDeleted: softDelete.length,
+      hardDeletedIds: hardDelete,
+      softDeletedIds: softDelete,
     }, { status: 200 });
   } catch (err) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });

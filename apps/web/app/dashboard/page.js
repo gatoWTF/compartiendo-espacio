@@ -283,9 +283,11 @@ export default function DashboardPage() {
       const result = await api.mapas.eliminarEstacionamientos(selectedIds);
       if (result.success) {
         // Hard-deleted → remove from list; soft-deleted → mark as inactive
+        const hardIds = result.hardDeletedIds || [];
+        const softIds = result.softDeletedIds || [];
         setMyParkings(prev => prev
-          .filter(p => !selectedIds.includes(p.id) || result.softDeleted > 0)
-          .map(p => selectedIds.includes(p.id) ? { ...p, activo: false } : p)
+          .filter(p => !hardIds.includes(p.id))
+          .map(p => softIds.includes(p.id) ? { ...p, activo: false } : p)
         );
         setSelectedIds([]);
         const msg = result.softDeleted > 0

@@ -73,13 +73,7 @@ export default function MapaPageContainer() {
   const handleGPS = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition((pos) => {
-        if (window.__mapInstance) {
-          window.__mapInstance.setView([pos.coords.latitude, pos.coords.longitude], 15);
-          // Actualizar centro del radar visualmente
-          if (window.__radarCircle) {
-            window.__radarCircle.setLatLng([pos.coords.latitude, pos.coords.longitude]);
-          }
-        }
+        actions.setLocationOverride({ lat: pos.coords.latitude, lng: pos.coords.longitude });
       });
     }
   };

@@ -40,13 +40,13 @@ export async function POST(request) {
   if (!user) return NextResponse.json({ success: false, error: 'Token inválido.' }, { status: 401 });
 
   // Cleanup expired lock on this spot (so it can be re-acquired)
-  await supabase.from('spot_locks').delete()
+  await db.from('spot_locks').delete()
     .eq('estacionamiento_id', Number(estacionamiento_id))
     .eq('spot_label', spot_label)
     .lt('expires_at', new Date().toISOString());
 
   // Check if there's an active lock by another user
-  const { data: existing } = await supabase.from('spot_locks')
+  const { data: existing } = await db.from('spot_locks')
     .select('id, user_id')
     .eq('estacionamiento_id', Number(estacionamiento_id))
     .eq('spot_label', spot_label)
