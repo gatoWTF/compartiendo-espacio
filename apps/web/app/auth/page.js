@@ -78,32 +78,22 @@ export default function AuthPage() {
         }, 1500);
 
       } else {
-        const { error, data: authData } = await supabase.auth.signUp({
-          email: data.email,
-          password: data.password,
-          options: {
-            data: { nombre: data.nombre, rol: data.rol },
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
-          }
+        // Signup via server-side route (evita rate limit de email y unexpected_failure)
+        const res = await fetch('/api/auth/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: data.email, password: data.password, nombre: data.nombre, rol: data.rol }),
         });
+        const result = await res.json();
 
-        if (error) throw error;
+        if (!res.ok) throw new Error(result.error || 'Error al crear cuenta.');
 
-        // User confirmed immediately (email confirmation disabled in Supabase)
-        const needsConfirm = !authData?.session && authData?.user && !authData.user.confirmed_at;
-
-        if (authData?.user && !needsConfirm) {
-          await supabase.from('perfiles').upsert({
-            id: authData.user.id,
-            nombre: data.nombre,
-            rol: data.rol
-          }, { onConflict: 'id' });
-        }
-
-        if (needsConfirm) {
-          setPendingConfirm(true);
-          setLoading(false);
-          return;
+        if (result.autoLogin && result.session) {
+          // Restaurar sesión en el cliente con el token devuelto por el servidor
+          await supabase.auth.setSession({
+            access_token: result.session.access_token,
+            refresh_token: result.session.refresh_token,
+          });
         }
 
         setSuccessAnim(true);
