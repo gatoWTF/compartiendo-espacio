@@ -100,16 +100,20 @@ export async function POST(request) {
       );
     }
 
+    const latVal = parseFloat(body.lat);
+    const lngVal = parseFloat(body.lng);
     const parkingData = {
       nombre: body.nombre,
       arrendador: body.arrendador,
-      lat: parseFloat(body.lat),
-      lng: parseFloat(body.lng),
+      lat: latVal,
+      lng: lngVal,
+      coordenadas: `SRID=4326;POINT(${lngVal} ${latVal})`,
       total_spots: parseInt(body.totalSpots) || 1,
       occupied_spots: 0,
       es_pmr: body.esPmr || false,
       user_id: body.userId,
-      precio_hora: 1500, // Regla de negocio: precio base en CLP
+      precio_hora: parseInt(body.precioHora) || 1500,
+      comuna: body.comuna || null,
     };
 
     const db = getSupabaseWithToken(token);
