@@ -1,6 +1,8 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useMapRadar } from '../../src/hooks/useMapRadar';
+import { api } from '../../src/lib/api';
+import { supabase } from '@parkings/supabase-db';
 import dynamic from 'next/dynamic';
 
 const Map = dynamic(() => import('../../src/components/Map'), { ssr: false });
@@ -8,9 +10,59 @@ const Map = dynamic(() => import('../../src/components/Map'), { ssr: false });
 export default function MapaPageContainer() {
   const { state, actions } = useMapRadar();
   const [filters, setFilters] = useState({ p2p: false, pmr: false });
-  
-  // Sincronizar el radio local con el global del hook para fluidez
   const [localRadius, setLocalRadius] = useState(state.radius);
+
+  // ── Búsqueda avanzada ──
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQ, setSearchQ] = useState('');
+  const [searchComuna, setSearchComuna] = useState('');
+  const [searchPmr, setSearchPmr] = useState(false);
+  const [searchDisponible, setSearchDisponible] = useState(false);
+  const [searchPrecioMax, setSearchPrecioMax] = useState('');
+
+  // ── Favoritos ──
+  const [favIds, setFavIds] = useState(new Set());
+  const [favLoading, setFavLoading] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) return;
+      api.favoritos.listar().then(res => {
+        if (res.success) {
+          setFavIds(new Set(res.data.map(f => f.estacionamiento?.id ?? f.estacionamiento_id)));
+        }
+      });
+    });
+  }, []);
+
+  const toggleFavorito = useCallback(async (spot) => {
+    const id = spot.id;
+    setFavLoading(true);
+    if (favIds.has(id)) {
+      await api.favoritos.quitar(id);
+      setFavIds(prev => { const s = new Set(prev); s.delete(id); return s; });
+    } else {
+      await api.favoritos.agregar(id);
+      setFavIds(prev => new Set(prev).add(id));
+    }
+    setFavLoading(false);
+  }, [favIds]);
+
+  const handleBusquedaAvanzada = () => {
+    // Aplica los filtros de texto/comuna pasando parámetros al hook via URL
+    // El hook useMapRadar ya llama a /api/mapas/search; para búsqueda avanzada
+    // hacemos el fetch directo aquí y lo inyectamos al estado del hook.
+    const filtros = {};
+    if (searchQ) filtros.q = searchQ;
+    if (searchComuna) filtros.comuna = searchComuna;
+    if (searchPmr) filtros.pmr = 'true';
+    if (searchDisponible) filtros.disponible = 'true';
+    if (searchPrecioMax) filtros.precioMax = searchPrecioMax;
+    api.mapas.buscar(filtros).then(res => {
+      if (res.success) actions.setParkingsOverride?.(res.data);
+    });
+    setSearchOpen(false);
+  };
 
   const handleGPS = () => {
     if (navigator.geolocation) {
@@ -108,10 +160,76 @@ export default function MapaPageContainer() {
           </div>
         </div>
 
-        <button className="btn-gps-strict" onClick={handleGPS} aria-label="Centrar en mi ubicación">
-          <i className="fa-solid fa-location-crosshairs"></i>
-        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <button className="btn-gps-strict" onClick={handleGPS} aria-label="Centrar en mi ubicación">
+            <i className="fa-solid fa-location-crosshairs"></i>
+          </button>
+          <button
+            className="btn-gps-strict"
+            onClick={() => setSearchOpen(o => !o)}
+            aria-label="Búsqueda avanzada"
+            style={searchOpen ? { color: 'white', borderColor: 'rgba(59,130,246,0.5)', background: 'rgba(59,130,246,0.2)' } : {}}
+          >
+            <i className="fa-solid fa-magnifying-glass"></i>
+          </button>
+        </div>
       </div>
+
+      {/* ── PANEL BÚSQUEDA AVANZADA ── */}
+      {searchOpen && (
+        <div className="glass-panel-strict search-panel">
+          <div className="panel-header" style={{ marginBottom: '14px' }}>
+            <i className="fa-solid fa-sliders text-blue-400"></i>
+            <span>Filtros Avanzados</span>
+            <button className="btn-close-strict" style={{ marginLeft: 'auto' }} onClick={() => setSearchOpen(false)}>
+              <i className="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+
+          <input
+            className="search-input"
+            placeholder="Nombre del estacionamiento..."
+            value={searchQ}
+            onChange={e => setSearchQ(e.target.value)}
+          />
+          <input
+            className="search-input"
+            placeholder="Comuna (ej: Providencia)"
+            value={searchComuna}
+            onChange={e => setSearchComuna(e.target.value)}
+            style={{ marginTop: '8px' }}
+          />
+          <input
+            className="search-input"
+            placeholder="Precio máx / hora (CLP)"
+            type="number"
+            value={searchPrecioMax}
+            onChange={e => setSearchPrecioMax(e.target.value)}
+            style={{ marginTop: '8px' }}
+          />
+
+          <div className="panel-divider" style={{ margin: '12px 0' }}></div>
+
+          <div className="filter-row" style={{ paddingTop: 0 }}>
+            <span className="switch-text">Solo disponibles</span>
+            <label className="modern-switch">
+              <input type="checkbox" checked={searchDisponible} onChange={e => setSearchDisponible(e.target.checked)} />
+              <span className="slider round"></span>
+            </label>
+          </div>
+          <div className="filter-row">
+            <span className="switch-text text-blue-400">Solo PMR</span>
+            <label className="modern-switch">
+              <input type="checkbox" checked={searchPmr} onChange={e => setSearchPmr(e.target.checked)} />
+              <span className="slider round blue"></span>
+            </label>
+          </div>
+
+          <button className="btn-reserve-strict" style={{ marginTop: '14px' }} onClick={handleBusquedaAvanzada}>
+            <i className="fa-solid fa-magnifying-glass"></i> Buscar
+          </button>
+        </div>
+      )}
 
       {/* ── ÁREA DEL MAPA ── */}
       <div className="map-area">
@@ -132,9 +250,20 @@ export default function MapaPageContainer() {
         <div className={`glass-panel-strict reservation-panel ${state.selectedSpot ? 'slide-in' : ''}`}>
           <div className="res-header">
             <h3><i className="fa-solid fa-square-parking text-blue-500 mr-2"></i> {state.selectedSpot.nombre}</h3>
-            <button className="btn-close-strict" onClick={() => actions.setSelectedSpot(null)}>
-              <i className="fa-solid fa-xmark"></i>
-            </button>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button
+                className="btn-close-strict"
+                onClick={() => toggleFavorito(state.selectedSpot)}
+                disabled={favLoading}
+                title={favIds.has(state.selectedSpot.id) ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+                style={{ color: favIds.has(state.selectedSpot.id) ? '#f59e0b' : '#64748b', fontSize: '1.1rem' }}
+              >
+                <i className={`fa-${favIds.has(state.selectedSpot.id) ? 'solid' : 'regular'} fa-star`}></i>
+              </button>
+              <button className="btn-close-strict" onClick={() => actions.setSelectedSpot(null)}>
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            </div>
           </div>
           
           <div className="res-body">
@@ -408,9 +537,34 @@ export default function MapaPageContainer() {
         }
         .btn-reserve-strict:hover { background: #1d4ed8; }
 
+        /* Búsqueda avanzada */
+        .search-panel {
+          position: absolute;
+          top: 24px;
+          left: 360px;
+          z-index: 1000;
+          width: 280px;
+          padding: 18px;
+        }
+        .search-input {
+          width: 100%;
+          padding: 10px 14px;
+          background: rgba(0,0,0,0.3);
+          border: 1px solid rgba(255,255,255,0.1);
+          border-radius: 10px;
+          color: white;
+          font-size: 0.9rem;
+          outline: none;
+          box-sizing: border-box;
+          transition: border-color 0.2s;
+        }
+        .search-input:focus { border-color: rgba(59,130,246,0.5); }
+        .search-input::placeholder { color: #64748b; }
+
         @media (max-width: 600px) {
           .radar-overlay { width: calc(100% - 48px); }
           .btn-gps-strict { position: absolute; right: 0; top: 0; }
+          .search-panel { left: 24px; top: auto; bottom: 24px; width: calc(100% - 48px); }
         }
       `}</style>
     </div>

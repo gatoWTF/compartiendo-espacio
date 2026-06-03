@@ -128,6 +128,6 @@ export function useMapRadar() {
 
   return {
     state: { userLoc, parkings, radius, sortOption, selectedSpot, loading, isCloud, mobileMenuOpen, isReserving, reserveStep, reserveError, userProfile },
-    actions: { setRadius, setSortOption, setSelectedSpot, setMobileMenuOpen, handleReserve }
+    actions: { setRadius, setSortOption, setSelectedSpot, setMobileMenuOpen, handleReserve, setParkingsOverride: setParkings }
   };
 }
