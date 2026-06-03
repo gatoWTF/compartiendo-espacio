@@ -9,12 +9,13 @@ const DURATION_OPTIONS = [
   { label: 'Día completo', hours: 8 },
 ];
 
-function generateSpots(parking) {
+// status: 'available' | 'occupied' | 'reserved' (temp lock, punto 3) | 'pmr'
+function generateSpots(parking, tempLocks = new Set()) {
   const total = Math.max(parking.total_spots || 8, 1);
   const occupied = Math.min(parking.occupied_spots || 0, total);
-  const pmr = parking.es_pmr;
+  const hasPmr = parking.es_pmr;
 
-  // Seeded shuffle so occupied positions stay stable per parking
+  // Seeded deterministic distribution so occupied positions are stable per parking
   const seed = parking.id || 1;
   const rng = (n) => ((seed * 1103515245 + n * 12345) & 0x7fffffff) % total;
 
@@ -22,30 +23,46 @@ function generateSpots(parking) {
   let attempts = 0;
   while (occupiedSet.size < occupied && attempts < total * 3) {
     const idx = rng(attempts++);
-    // Don't mark PMR spots as randomly occupied
-    if (!pmr || idx < total - 2) occupiedSet.add(idx);
+    if (!hasPmr || idx < total - 2) occupiedSet.add(idx);
   }
 
   return Array.from({ length: total }, (_, i) => {
-    const isPmr = pmr && i >= total - 2;
-    return {
-      id: i,
-      label: `${String.fromCharCode(65 + Math.floor(i / 6))}${(i % 6) + 1}`,
-      available: !occupiedSet.has(i),
-      pmr: isPmr,
-    };
+    const label = `${String.fromCharCode(65 + Math.floor(i / 6))}${(i % 6) + 1}`;
+    const isPmr = hasPmr && i >= total - 2;
+    const isOccupied = occupiedSet.has(i);
+    const isTempLocked = tempLocks.has(label);
+
+    let status;
+    if (isOccupied)    status = 'occupied';
+    else if (isTempLocked) status = 'reserved';
+    else if (isPmr)    status = 'pmr';
+    else               status = 'available';
+
+    return { id: i, label, status };
   });
 }
 
 const STEP = { SELECT: 1, CONFIRM: 2, PROCESSING: 3, SUCCESS: 4 };
 
-export default function ParkingSelector({ parking, onClose, onReserve, isReserving }) {
+// Visual config per status
+const SPOT_STYLE = {
+  available:  { bg: '#10b981', label: 'Disponible',  selectable: true  },
+  pmr:        { bg: '#3b82f6', label: 'PMR',          selectable: true  },
+  occupied:   { bg: '#ef4444', label: 'Ocupada',      selectable: false },
+  reserved:   { bg: '#f59e0b', label: 'Reservada',    selectable: false },
+};
+
+export default function ParkingSelector({ parking, onClose, onReserve, isReserving, tempLocks }) {
   const [step, setStep] = useState(STEP.SELECT);
   const [selectedSpot, setSelectedSpot] = useState(null);
   const [duration, setDuration] = useState(DURATION_OPTIONS[1]);
+  const [reserveError, setReserveError] = useState(null);
 
-  const spots = useMemo(() => generateSpots(parking), [parking]);
-  const totalPrice = Math.round(parking.precio_hora * duration.hours);
+  const spots = useMemo(
+    () => generateSpots(parking, tempLocks || new Set()),
+    [parking, tempLocks]
+  );
+  const totalPrice = Math.round((parking.precio_hora || 0) * duration.hours);
   const rows = useMemo(() => {
     const r = {};
     spots.forEach(s => {
@@ -57,9 +74,15 @@ export default function ParkingSelector({ parking, onClose, onReserve, isReservi
   }, [spots]);
 
   const handleConfirm = async () => {
+    setReserveError(null);
     setStep(STEP.PROCESSING);
-    await onReserve();
-    setStep(STEP.SUCCESS);
+    const result = await onReserve({ spotLabel: selectedSpot.label, durationHours: duration.hours });
+    if (result?.success === false) {
+      setReserveError(result.error || 'No se pudo completar la reserva.');
+      setStep(STEP.CONFIRM);
+    } else {
+      setStep(STEP.SUCCESS);
+    }
   };
 
   return (
@@ -112,17 +135,21 @@ export default function ParkingSelector({ parking, onClose, onReserve, isReservi
           {step === STEP.SELECT && (
             <>
               {/* Legend */}
-              <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', fontSize: '0.75rem' }}>
-                {[['#10b981', 'Disponible'], ['#ef4444', 'Ocupado'], ['#3b82f6', 'PMR'], ['#f59e0b', 'Seleccionado']].map(([c, l]) => (
-                  <div key={l} style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#94a3b8' }}>
-                    <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: c }}></div>
-                    {l}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '14px' }}>
+                {Object.entries(SPOT_STYLE).map(([key, cfg]) => (
+                  <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#94a3b8', fontSize: '0.73rem' }}>
+                    <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: cfg.bg, opacity: cfg.selectable ? 1 : 0.5 }}></div>
+                    {cfg.label}
                   </div>
                 ))}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#94a3b8', fontSize: '0.73rem' }}>
+                  <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: '#f59e0b', border: '2px solid white' }}></div>
+                  Seleccionada
+                </div>
               </div>
 
               {/* Entry direction */}
-              <div style={{ textAlign: 'center', marginBottom: '10px', color: '#475569', fontSize: '0.75rem', letterSpacing: '2px', textTransform: 'uppercase', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+              <div style={{ marginBottom: '10px', color: '#475569', fontSize: '0.73rem', letterSpacing: '2px', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.04)' }}></div>
                 <i className="fa-solid fa-arrow-up"></i> ENTRADA
                 <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.04)' }}></div>
@@ -136,22 +163,34 @@ export default function ParkingSelector({ parking, onClose, onReserve, isReservi
                     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                       {rowSpots.map(spot => {
                         const isSelected = selectedSpot?.id === spot.id;
-                        let bg = '#ef4444';
-                        let cursor = 'not-allowed';
-                        let opacity = 0.5;
-                        if (spot.available && spot.pmr) { bg = '#3b82f6'; cursor = 'pointer'; opacity = 1; }
-                        else if (spot.available) { bg = '#10b981'; cursor = 'pointer'; opacity = 1; }
-                        if (isSelected) bg = '#f59e0b';
+                        const cfg = SPOT_STYLE[spot.status] || SPOT_STYLE.available;
+                        const activeBg = isSelected ? '#f59e0b' : cfg.bg;
                         return (
                           <button
                             key={spot.id}
-                            disabled={!spot.available}
-                            onClick={() => spot.available && setSelectedSpot(spot)}
-                            aria-label={`Plaza ${spot.label}${!spot.available ? ' - Ocupada' : spot.pmr ? ' - PMR' : ''}`}
-                            style={{ width: '44px', height: '36px', borderRadius: '8px', background: `${bg}${isSelected ? '' : '33'}`, border: `2px solid ${bg}`, color: isSelected ? '#000' : bg, fontSize: '0.68rem', fontWeight: 800, cursor, opacity, transition: 'all 0.15s', transform: isSelected ? 'scale(1.1)' : 'scale(1)', boxShadow: isSelected ? `0 0 12px ${bg}88` : 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1px' }}
+                            disabled={!cfg.selectable}
+                            onClick={() => cfg.selectable && setSelectedSpot(spot)}
+                            aria-label={`Plaza ${spot.label} — ${isSelected ? 'Seleccionada' : cfg.label}`}
+                            title={`Plaza ${spot.label} — ${cfg.label}`}
+                            style={{
+                              width: '44px', height: '38px', borderRadius: '8px',
+                              background: isSelected ? '#f59e0b' : `${cfg.bg}22`,
+                              border: `2px solid ${isSelected ? '#f59e0b' : cfg.bg}`,
+                              color: isSelected ? '#000' : cfg.bg,
+                              fontSize: '0.68rem', fontWeight: 800,
+                              cursor: cfg.selectable ? 'pointer' : 'not-allowed',
+                              opacity: cfg.selectable ? 1 : 0.45,
+                              transition: 'all 0.15s',
+                              transform: isSelected ? 'scale(1.12)' : 'scale(1)',
+                              boxShadow: isSelected ? `0 0 14px ${activeBg}99` : 'none',
+                              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '2px',
+                            }}
                           >
-                            {spot.pmr ? <i className="fa-solid fa-wheelchair" style={{ fontSize: '0.7rem' }}></i> : <i className="fa-solid fa-car" style={{ fontSize: '0.6rem' }}></i>}
-                            <span style={{ fontSize: '0.6rem' }}>{spot.label}</span>
+                            {spot.status === 'pmr'      && <i className="fa-solid fa-wheelchair" style={{ fontSize: '0.68rem' }}></i>}
+                            {spot.status === 'occupied' && <i className="fa-solid fa-lock"       style={{ fontSize: '0.6rem'  }}></i>}
+                            {spot.status === 'reserved' && <i className="fa-solid fa-clock"      style={{ fontSize: '0.6rem'  }}></i>}
+                            {(spot.status === 'available' || isSelected) && <i className="fa-solid fa-car" style={{ fontSize: '0.6rem' }}></i>}
+                            <span style={{ fontSize: '0.58rem' }}>{spot.label}</span>
                           </button>
                         );
                       })}

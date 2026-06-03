@@ -58,7 +58,7 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    const { parking_id, user_id, fecha_inicio, fecha_fin } = body;
+    const { parking_id, user_id, fecha_inicio, fecha_fin, spot_label, duration_hours } = body;
     if (!parking_id || !user_id) {
       return NextResponse.json({ success: false, error: 'Faltan parking_id o user_id.' }, { status: 400 });
     }
@@ -74,16 +74,30 @@ export async function POST(request) {
     let reserva, error;
     // estacionamientos.id es integer en producción — coercionar explícitamente
     const estId = Number(parking_id);
-    if (fecha_inicio && fecha_fin) {
+    // Compute fecha_inicio / fecha_fin from duration_hours when not explicitly provided
+    const resolvedInicio = fecha_inicio ?? new Date().toISOString();
+    const resolvedFin = fecha_fin ?? (duration_hours
+      ? new Date(Date.now() + duration_hours * 3600 * 1000).toISOString()
+      : null);
+
+    if (resolvedFin) {
       ({ data: reserva, error } = await db.rpc('crear_reserva_pro', {
         p_estacionamiento_id: estId,
-        p_fecha_inicio: fecha_inicio,
-        p_fecha_fin: fecha_fin,
+        p_fecha_inicio: resolvedInicio,
+        p_fecha_fin: resolvedFin,
       }));
     } else {
       ({ data: reserva, error } = await db.rpc('reservar_estacionamiento', {
         p_estacionamiento_id: estId,
       }));
+    }
+
+    // Attach spot_label to the reservation row if the RPC returned an id
+    if (!error && reserva && spot_label) {
+      const reservaId = typeof reserva === 'object' ? reserva.id ?? reserva : reserva;
+      if (reservaId) {
+        await db.from('reservas').update({ spot_label }).eq('id', reservaId);
+      }
     }
 
     if (error) {

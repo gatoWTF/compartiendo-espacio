@@ -83,30 +83,35 @@ export function useMapRadar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [radius, userLoc.lat, userLoc.lng]);
 
-  const handleReserve = async () => {
-    // Use Supabase session instead of localStorage
+  const handleReserve = async ({ spotLabel, durationHours = 1 } = {}) => {
     const { data: { session: authSession } } = await supabase.auth.getSession();
     if (!authSession?.user) {
       router.push('/auth');
-      return;
+      return { success: false, error: 'No autenticado.' };
     }
 
     setIsReserving(true);
     setReserveError(null);
-    setReserveStep(1); 
+    setReserveStep(1);
 
     try {
       const check = await api.reservas.verificarDisponibilidad(selectedSpot.id);
       if (!check.success || !check.available) {
-        throw new Error('El nodo ya no está disponible o está lleno.');
+        throw new Error('El estacionamiento ya no está disponible o está lleno.');
       }
 
       setReserveStep(2);
 
+      const fecha_inicio = new Date().toISOString();
+      const fecha_fin = new Date(Date.now() + durationHours * 3600 * 1000).toISOString();
+
       const resData = await api.reservas.crearReserva({
         parking_id: selectedSpot.id,
         user_id: authSession.user.id,
-        duration_hours: 1
+        spot_label: spotLabel,
+        duration_hours: durationHours,
+        fecha_inicio,
+        fecha_fin,
       });
 
       if (!resData.success) {
@@ -114,20 +119,20 @@ export function useMapRadar() {
       }
 
       setReserveStep(3);
-      loadParkings();
+      loadParkings(radius, userLoc.lat, userLoc.lng);
 
       setTimeout(() => {
         setIsReserving(false);
         setReserveStep(0);
-        setSelectedSpot(null); 
+        setSelectedSpot(null);
       }, 3000);
 
+      return { success: true };
     } catch (err) {
       setReserveError(err.message);
-      setTimeout(() => {
-        setIsReserving(false);
-        setReserveStep(0);
-      }, 3000);
+      setIsReserving(false);
+      setReserveStep(0);
+      return { success: false, error: err.message };
     }
   };
 
