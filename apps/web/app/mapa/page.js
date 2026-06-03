@@ -95,7 +95,7 @@ export default function MapaPageContainer() {
 
   return (
     <div className="map-page-wrapper">
-      
+
       {/* ── PANEL DE RADAR (Top Left - True Glassmorphism) ── */}
       <div className="radar-overlay">
         <div className="glass-panel-strict">
@@ -103,7 +103,20 @@ export default function MapaPageContainer() {
             <i className="fa-solid fa-satellite-dish pulse-icon text-green-500"></i>
             <span>Radar de Proximidad</span>
           </div>
-          
+
+          {/* Indicador de precisión de ubicación */}
+          {state.locationSource && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px',
+              fontSize: '0.72rem', fontWeight: 600, letterSpacing: '0.5px',
+              color: state.locationSource === 'gps' ? '#10b981' : state.locationSource === 'network' ? '#f59e0b' : '#94a3b8' }}>
+              <i className={`fa-solid fa-${state.locationSource === 'gps' ? 'satellite' : state.locationSource === 'network' ? 'wifi' : 'globe'}`}></i>
+              {state.locationSource === 'gps'     && 'GPS · Alta precisión'}
+              {state.locationSource === 'network' && 'Red · Precisión media'}
+              {state.locationSource === 'ip'      && 'IP · Aproximada — activa el GPS'}
+              {state.locationSource === 'fallback'&& 'Sin ubicación — activa el GPS'}
+            </div>
+          )}
+
           <div className="panel-divider"></div>
 
           {/* Control de Alcance (Slider) */}
