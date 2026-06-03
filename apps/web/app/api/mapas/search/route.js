@@ -48,6 +48,7 @@ export async function GET(request) {
     const comuna = searchParams.get('comuna') || null;
     const pmr = searchParams.get('pmr');
     const disponible = searchParams.get('disponible');
+    const precioMin = parseFloat(searchParams.get('precioMin'));
     const precioMax = parseFloat(searchParams.get('precioMax'));
 
     const hasGeo = !Number.isNaN(lat) && !Number.isNaN(lng) && !Number.isNaN(radius) && radius > 0 && radius < 9999;
@@ -68,7 +69,11 @@ export async function GET(request) {
       if (error) {
         return NextResponse.json({ success: false, error: error.message, data: [] }, { status: 500 });
       }
-      return NextResponse.json({ success: true, data: data || [] }, {
+      // precioMin not supported in RPC — filter in-memory
+      const filtered = !Number.isNaN(precioMin)
+        ? (data || []).filter(p => p.precio_hora == null || p.precio_hora >= precioMin)
+        : (data || []);
+      return NextResponse.json({ success: true, data: filtered }, {
         status: 200,
         headers: { 'Cache-Control': 'public, max-age=20, stale-while-revalidate=60' },
       });
@@ -84,6 +89,7 @@ export async function GET(request) {
     }
     if (comuna) query = query.ilike('comuna', comuna);
     if (pmr === 'true') query = query.eq('es_pmr', true);
+    if (!Number.isNaN(precioMin)) query = query.gte('precio_hora', precioMin);
     if (!Number.isNaN(precioMax)) query = query.lte('precio_hora', precioMax);
 
     const { data, error } = await query;
@@ -277,7 +283,7 @@ export async function DELETE(request) {
         .eq('estacionamiento_id', id)
         .in('estado', ['pendiente', 'confirmada', 'activa']);
 
-      if (count > 0) softDelete.push(id);
+      if ((count ?? 0) > 0) softDelete.push(id);
       else           hardDelete.push(id);
     }
 

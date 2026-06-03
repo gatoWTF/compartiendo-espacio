@@ -30,7 +30,8 @@ export async function GET(request) {
     const scope = searchParams.get('scope') || 'conductor';
     const db = getSupabaseWithToken(token);
 
-    const { data: { user } } = await db.auth.getUser();
+    const { data: authData } = await db.auth.getUser();
+    const user = authData?.user ?? null;
     if (!user) return NextResponse.json({ success: false, error: 'Sesión inválida.' }, { status: 401 });
 
     let query = db

@@ -8,14 +8,14 @@ export const metadata = {
   icons: { icon: '/favicon.ico' },
   openGraph: {
     title: "Parkings Together",
-    description: "Encuentra y comparte estacionamientos P2P cerca de ti.",
+    description: "Encuentra estacionamientos cerca de ti o publica tu plaza disponible.",
     type: 'website',
     locale: 'es_CL',
   },
   twitter: {
     card: 'summary',
     title: "Parkings Together",
-    description: "Encuentra y comparte estacionamientos P2P cerca de ti.",
+    description: "Encuentra estacionamientos cerca de ti o publica tu plaza disponible.",
   },
 };
 

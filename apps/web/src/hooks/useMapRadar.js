@@ -7,6 +7,7 @@ import { toast } from 'react-hot-toast';
 
 export function useMapRadar() {
   const { location: gpsLoc, locationSource, isLoading: isLocating, error: locError, userProfile } = useGeolocation();
+  // locOverride is cleared after one load cycle so live GPS resumes automatically
   const [locOverride, setLocOverride] = useState(null);
   const userLoc = locOverride || gpsLoc;
   const [parkings, setParkings] = useState([]);
@@ -46,6 +47,8 @@ export function useMapRadar() {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       loadParkings(radius, userLoc.lat, userLoc.lng);
+      // Clear override after first load so live GPS resumes
+      if (locOverride) setLocOverride(null);
     }, 400);
 
     // ─── WEBSOCKETS REALTIME SUBSCRIPTION ───
@@ -133,7 +136,7 @@ export function useMapRadar() {
       });
 
       if (!resData.success) {
-        throw new Error(resData.error || 'Error al completar la transacción P2P.');
+        throw new Error(resData.error || 'No se pudo completar la reserva.');
       }
 
       setReserveStep(3);

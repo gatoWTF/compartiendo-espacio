@@ -316,7 +316,7 @@ export default function ParkingSelector({ parking, onClose, onReserve, isReservi
               {parking.comuna && <span><i className="fa-solid fa-location-dot" style={{ marginRight: '4px', color: '#64748b' }}></i>{parking.comuna}</span>}
               {parking.precio_hora > 0 && <span style={{ color: '#f59e0b', fontWeight: 700 }}>${parking.precio_hora?.toLocaleString()}/hr</span>}
               {parking.price_per_day > 0 && <span style={{ color: '#a78bfa', fontWeight: 700 }}>${parking.price_per_day?.toLocaleString()}/día</span>}
-              {parking.es_pmr && <span style={{ color: '#38bdf8' }}><i className="fa-solid fa-wheelchair" style={{ marginRight: '4px' }}></i>PMR</span>}
+              {parking.es_pmr && <span style={{ color: '#38bdf8' }}><i className="fa-solid fa-wheelchair" style={{ marginRight: '4px' }}></i>Accesible</span>}
             </div>
           </div>
           <button onClick={handleClose} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', color: '#94a3b8', cursor: 'pointer', padding: '8px 10px', fontSize: '1rem' }} aria-label="Cerrar">
