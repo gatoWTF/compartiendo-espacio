@@ -2,8 +2,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@parkings/supabase-db';
-import { toast, Toaster } from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 import { api } from '../../src/lib/api';
+import ReviewModal from '../../src/components/ReviewModal';
 
 export default function ProfilePage() {
   const [session, setSession] = useState(null);
@@ -55,13 +56,12 @@ export default function ProfilePage() {
     else toast.error(res.error || 'No se pudo cancelar');
   };
 
-  const handleCalificarReserva = async (id) => {
-    const valor = parseInt(window.prompt('Califica tu experiencia (1 a 5):'), 10);
-    if (!valor || valor < 1 || valor > 5) { toast.error('Calificación inválida'); return; }
-    const comentario = window.prompt('Comentario (opcional):') || null;
-    const res = await api.reservas.calificar(id, valor, comentario);
-    if (res.success) { toast.success('¡Gracias por tu calificación!'); cargarReservas(); }
-    else toast.error(res.error || 'No se pudo calificar');
+  const [reviewModal, setReviewModal] = useState(null); // { reservaId }
+
+  const handleSubmitReview = async ({ reservaId, stars, comentario }) => {
+    const res = await api.reservas.calificar(reservaId, stars, comentario);
+    if (!res.success) throw new Error(res.error || 'No se pudo calificar');
+    cargarReservas();
   };
 
   const fmtFecha = (f) => f ? new Date(f).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
@@ -239,7 +239,7 @@ export default function ProfilePage() {
 
   return (
     <div className="profile-wrapper">
-      <Toaster position="top-right" toastOptions={{ style: { background: '#1e293b', color: '#fff', border: '1px solid #3b82f6' } }} />
+      {reviewModal && <ReviewModal reservaId={reviewModal.reservaId} onClose={() => setReviewModal(null)} onSubmit={handleSubmitReview} />}
       <div className="cyber-grid-bg"></div>
 
       <div className="profile-container">
@@ -440,7 +440,7 @@ export default function ProfilePage() {
                           </button>
                         )}
                         {r.estado === 'completada' && !r.calificacion && (
-                          <button onClick={() => handleCalificarReserva(r.id)} className="btn-cyber-secondary" style={{ padding: '8px 14px' }}>
+                          <button onClick={() => setReviewModal({ reservaId: r.id })} className="btn-cyber-secondary" style={{ padding: '8px 14px' }}>
                             <i className="fa-solid fa-star"></i> Calificar
                           </button>
                         )}

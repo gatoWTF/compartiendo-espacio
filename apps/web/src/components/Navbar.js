@@ -43,7 +43,6 @@ const LogoSVG = ({ className }) => (
 const NAV_ITEMS = [
   { href: '/', label: 'Inicio', icon: 'fa-house' },
   { href: '/mapa', label: 'Buscar Plaza', icon: 'fa-map-location-dot' },
-  { href: '/sobre-mi', label: 'Acerca de', icon: 'fa-circle-info' },
 ];
 
 const AUTH_NAV_ITEMS = [

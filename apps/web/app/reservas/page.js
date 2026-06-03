@@ -2,6 +2,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@parkings/supabase-db';
+import { toast } from 'react-hot-toast';
+import ReviewModal from '../../src/components/ReviewModal';
 
 const ESTADOS = {
   pendiente:  { label: 'Pendiente',  color: '#f59e0b' },
@@ -24,8 +26,6 @@ export default function ReservasPage() {
   const [reservasArr, setReservasArr] = useState([]);
   const [actionLoading, setActionLoading] = useState(null);
   const [ratingModal, setRatingModal] = useState(null); // { reservaId }
-  const [stars, setStars] = useState(5);
-  const [comentario, setComentario] = useState('');
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
@@ -74,6 +74,7 @@ export default function ReservasPage() {
 
   const doAction = async (action, reservaId, extra = {}) => {
     setActionLoading(reservaId + action);
+    const actionLabels = { confirmar: 'confirmada', cancelar: 'cancelada', completar: 'completada', calificar: 'calificada' };
     try {
       const res = await fetch('/api/reservas/manage', {
         method: 'PATCH',
@@ -81,18 +82,28 @@ export default function ReservasPage() {
         body: JSON.stringify({ action, reserva_id: reservaId, ...extra }),
       });
       const data = await res.json();
-      if (data.success) await fetchReservas(session.access_token);
+      if (data.success) {
+        await fetchReservas(session.access_token);
+        toast.success(`Reserva ${actionLabels[action] || 'actualizada'}`);
+      } else {
+        toast.error(data.error || 'No se pudo realizar la acción.');
+      }
+    } catch {
+      toast.error('Error de red. Inténtalo de nuevo.');
     } finally {
       setActionLoading(null);
     }
   };
 
-  const handleCalificar = async () => {
-    if (!ratingModal) return;
-    await doAction('calificar', ratingModal.reservaId, { calificacion: stars, comentario });
-    setRatingModal(null);
-    setStars(5);
-    setComentario('');
+  const handleSubmitReview = async ({ reservaId, stars, comentario }) => {
+    const res = await fetch('/api/reservas/manage', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ action: 'calificar', reserva_id: reservaId, calificacion: stars, comentario }),
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'No se pudo enviar la calificación.');
+    await fetchReservas(session.access_token);
   };
 
   const activeData = tab === 'conductor' ? reservas : reservasArr;
@@ -227,32 +238,12 @@ export default function ReservasPage() {
         </div>
       )}
 
-      {/* Rating modal */}
       {ratingModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }} onClick={() => setRatingModal(null)}>
-          <div style={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px', padding: '32px', width: '360px', maxWidth: '90vw' }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ color: '#f8fafc', fontWeight: 800, marginBottom: '20px', textAlign: 'center' }}>
-              <i className="fa-solid fa-star" style={{ color: '#f59e0b', marginRight: '8px' }}></i>
-              Califica esta reserva
-            </h3>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '20px' }}>
-              {[1,2,3,4,5].map(n => (
-                <button key={n} onClick={() => setStars(n)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '2rem', color: n <= stars ? '#f59e0b' : '#334155' }} aria-label={`${n} estrella${n > 1 ? 's' : ''}`}>★</button>
-              ))}
-            </div>
-            <textarea
-              value={comentario}
-              onChange={e => setComentario(e.target.value)}
-              placeholder="Comentario opcional..."
-              maxLength={500}
-              style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', color: '#e2e8f0', padding: '10px 14px', fontSize: '0.9rem', resize: 'vertical', minHeight: '80px', boxSizing: 'border-box' }}
-            />
-            <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-              <button onClick={() => setRatingModal(null)} style={{ flex: 1, padding: '10px', border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#94a3b8', borderRadius: '10px', cursor: 'pointer', fontWeight: 700 }}>Cancelar</button>
-              <button onClick={handleCalificar} style={{ flex: 2, padding: '10px', background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 800 }}>Enviar</button>
-            </div>
-          </div>
-        </div>
+        <ReviewModal
+          reservaId={ratingModal.reservaId}
+          onClose={() => setRatingModal(null)}
+          onSubmit={handleSubmitReview}
+        />
       )}
     </section>
   );

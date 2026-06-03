@@ -23,6 +23,7 @@ export default function MapaPageContainer() {
 
   // ── Selector de plaza ──
   const [selectorOpen, setSelectorOpen] = useState(false);
+  const [authToken, setAuthToken] = useState(null);
 
   // ── Favoritos ──
   const [favIds, setFavIds] = useState(new Set());
@@ -31,6 +32,7 @@ export default function MapaPageContainer() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) return;
+      setAuthToken(session.access_token);
       api.favoritos.listar().then(res => {
         if (res.success) {
           setFavIds(new Set(res.data.map(f => f.estacionamiento?.id ?? f.estacionamiento_id)));
@@ -381,6 +383,8 @@ export default function MapaPageContainer() {
           parking={state.selectedSpot}
           isReserving={state.isReserving}
           onReserve={actions.handleReserve}
+          tempLocks={state.tempLocks}
+          authToken={authToken}
           onClose={() => {
             setSelectorOpen(false);
             actions.setSelectedSpot(null);

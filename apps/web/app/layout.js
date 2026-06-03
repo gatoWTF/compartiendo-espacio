@@ -1,5 +1,6 @@
 import './globals.css';
 import Navbar from '../src/components/Navbar';
+import { Toaster } from 'react-hot-toast';
 
 export const metadata = {
   title: "Parkings Together | Encuentra y Comparte Estacionamientos",
@@ -28,6 +29,7 @@ export default function RootLayout({ children }) {
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
       </head>
       <body>
+        <Toaster position="top-right" toastOptions={{ style: { background: '#1e293b', color: '#f8fafc', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px' }, success: { iconTheme: { primary: '#10b981', secondary: '#fff' } }, error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } } }} />
         <Navbar />
         {children}
       </body>
