@@ -69,7 +69,7 @@ export default function ProfilePage() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) {
-        router.push('/auth');
+        router.push('/auth?redirectTo=/profile');
       } else {
         setSession(session);
         fetchPerfilData(session.user.id);
@@ -77,7 +77,7 @@ export default function ProfilePage() {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) router.push('/auth');
+      if (!session) router.push('/auth?redirectTo=/profile');
       else setSession(session);
     });
 
