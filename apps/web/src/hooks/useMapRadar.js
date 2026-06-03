@@ -75,7 +75,7 @@ export function useMapRadar() {
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [radius, userLoc]);
+  }, [radius, userLoc.lat, userLoc.lng]);
 
   const handleReserve = async () => {
     // Use Supabase session instead of localStorage
@@ -95,8 +95,7 @@ export function useMapRadar() {
         throw new Error('El nodo ya no está disponible o está lleno.');
       }
 
-      setReserveStep(2); 
-      await new Promise(resolve => setTimeout(resolve, 2000)); 
+      setReserveStep(2);
 
       const resData = await api.reservas.crearReserva({
         parking_id: selectedSpot.id,

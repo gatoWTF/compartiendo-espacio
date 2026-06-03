@@ -72,15 +72,17 @@ export async function PATCH(request) {
       case 'completar':
         result = await db.rpc('completar_reserva', { p_reserva_id: reserva_id });
         break;
-      case 'calificar':
-        if (!calificacion) {
-          return NextResponse.json({ success: false, error: 'Calificar requiere calificacion (1-5).' }, { status: 400 });
+      case 'calificar': {
+        const cal = parseInt(calificacion);
+        if (!Number.isFinite(cal) || cal < 1 || cal > 5) {
+          return NextResponse.json({ success: false, error: 'Calificación debe ser entre 1 y 5.' }, { status: 400 });
         }
         result = await db.rpc('calificar_reserva', {
           p_reserva_id: reserva_id,
-          p_calificacion: calificacion,
-          p_comentario: comentario ?? null,
+          p_calificacion: cal,
+          p_comentario: comentario ? String(comentario).slice(0, 500) : null,
         });
+      }
         break;
       case 'reprogramar':
         if (!fecha_inicio || !fecha_fin) {

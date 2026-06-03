@@ -1,25 +1,48 @@
 import { NextResponse } from 'next/server';
 import { getServiceSupabase } from '@parkings/supabase-db';
 
-// POST /api/auth/signup
-// Server-side signup usando Admin API (service role) para evitar el rate limit
-// de emails de Supabase y el error unexpected_failure cuando email confirmation
-// está activa sin SMTP configurado.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PW_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]).{8,}$/;
+
+const ipCounts = new Map();
+const WINDOW_MS = 60 * 60 * 1000;
+const MAX_PER_WINDOW = 10;
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const entry = ipCounts.get(ip);
+  if (!entry || now - entry.start > WINDOW_MS) {
+    ipCounts.set(ip, { start: now, count: 1 });
+    return true;
+  }
+  entry.count++;
+  return entry.count <= MAX_PER_WINDOW;
+}
+
 export async function POST(request) {
   try {
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    if (!checkRateLimit(ip)) {
+      return NextResponse.json({ error: 'Demasiados intentos. Espera unos minutos.' }, { status: 429 });
+    }
+
     const { email, password, nombre, rol } = await request.json();
 
     if (!email || !password || !nombre || !rol) {
       return NextResponse.json({ error: 'Faltan campos requeridos.' }, { status: 400 });
     }
-
+    if (!EMAIL_RE.test(email)) {
+      return NextResponse.json({ error: 'Email inválido.' }, { status: 400 });
+    }
+    if (!PW_RE.test(password)) {
+      return NextResponse.json({ error: 'Contraseña insegura: mínimo 8 caracteres, incluye mayúscula, minúscula, número y símbolo.' }, { status: 400 });
+    }
     if (!['cliente', 'arrendador'].includes(rol)) {
       return NextResponse.json({ error: 'Rol inválido.' }, { status: 400 });
     }
 
     const admin = getServiceSupabase();
 
-    // Crear usuario con email_confirm: true → no requiere verificación por email
     const { data: userData, error: createError } = await admin.auth.admin.createUser({
       email,
       password,
@@ -28,15 +51,13 @@ export async function POST(request) {
     });
 
     if (createError) {
-      // Traducir errores comunes
       if (createError.message?.includes('already registered') || createError.message?.includes('already been registered')) {
-        return NextResponse.json({ error: 'Este correo ya tiene una cuenta. Inicia sesión.' }, { status: 409 });
+        return NextResponse.json({ error: 'Credenciales inválidas o cuenta ya existente.' }, { status: 400 });
       }
-      return NextResponse.json({ error: createError.message }, { status: 400 });
+      console.error('[signup] createUser error:', createError.message);
+      return NextResponse.json({ error: 'No se pudo crear la cuenta.' }, { status: 400 });
     }
 
-    // Crear perfil (el trigger on_auth_user_created debería hacerlo, pero lo hacemos
-    // explícitamente con upsert para garantizarlo)
     const { error: profileError } = await admin.from('perfiles').upsert({
       id: userData.user.id,
       nombre,
@@ -44,12 +65,9 @@ export async function POST(request) {
     }, { onConflict: 'id' });
 
     if (profileError) {
-      console.error('[signup] Error al crear perfil:', profileError.message);
-      // No abortamos — el usuario se creó; el perfil se puede crear después
+      console.error('[signup] Profile error:', profileError.message);
     }
 
-    // Ahora iniciamos sesión para obtener el access_token del usuario
-    // (Admin API no devuelve session directamente)
     const { createClient } = await import('@supabase/supabase-js');
     const anonClient = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -63,7 +81,6 @@ export async function POST(request) {
     });
 
     if (signInError) {
-      // Usuario creado correctamente aunque no podamos auto-login
       return NextResponse.json({
         success: true,
         autoLogin: false,
@@ -84,7 +101,7 @@ export async function POST(request) {
     });
 
   } catch (err) {
-    console.error('[signup] Error inesperado:', err.message);
+    console.error('[signup] Unexpected:', err.message);
     return NextResponse.json({ error: 'Error interno del servidor.' }, { status: 500 });
   }
 }

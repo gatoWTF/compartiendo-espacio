@@ -55,16 +55,23 @@ export async function POST(request) {
 }
 
 export async function DELETE(request) {
-  const token = getToken(request);
-  if (!token) return NextResponse.json({ success: false, error: 'No autenticado.' }, { status: 401 });
+  try {
+    const token = getToken(request);
+    if (!token) return NextResponse.json({ success: false, error: 'No autenticado.' }, { status: 401 });
 
-  const { estacionamiento_id } = await request.json();
-  if (!estacionamiento_id) {
-    return NextResponse.json({ success: false, error: 'Falta estacionamiento_id.' }, { status: 400 });
+    const { estacionamiento_id } = await request.json();
+    if (!estacionamiento_id) {
+      return NextResponse.json({ success: false, error: 'Falta estacionamiento_id.' }, { status: 400 });
+    }
+
+    const db = getSupabaseWithToken(token);
+    const { data: { user } } = await db.auth.getUser();
+    if (!user) return NextResponse.json({ success: false, error: 'Sesión inválida.' }, { status: 401 });
+
+    const { error } = await db.from('favoritos').delete().eq('estacionamiento_id', estacionamiento_id).eq('user_id', user.id);
+    if (error) return NextResponse.json({ success: false, error: 'No se pudo eliminar.' }, { status: 400 });
+    return NextResponse.json({ success: true }, { status: 200 });
+  } catch {
+    return NextResponse.json({ success: false, error: 'Error interno.' }, { status: 500 });
   }
-
-  const db = getSupabaseWithToken(token);
-  const { error } = await db.from('favoritos').delete().eq('estacionamiento_id', estacionamiento_id);
-  if (error) return NextResponse.json({ success: false, error: error.message }, { status: 400 });
-  return NextResponse.json({ success: true }, { status: 200 });
 }
