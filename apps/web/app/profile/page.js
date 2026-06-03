@@ -162,7 +162,7 @@ export default function ProfilePage() {
     try {
       const { error } = await supabase.from('vehiculos').delete().eq('id', id);
       if (error) throw error;
-      setVehiculos(vehiculos.filter(v => v.id !== id));
+      setVehiculos(prev => prev.filter(v => v.id !== id));
       toast.success('Vehículo removido');
     } catch (error) {
       toast.error('Error al remover vehículo');
@@ -171,7 +171,7 @@ export default function ProfilePage() {
 
   const handleTogglePMR = async () => {
     const newValue = !perfil.requiere_pmr;
-    setPerfil({ ...perfil, requiere_pmr: newValue });
+    setPerfil(prev => ({ ...prev, requiere_pmr: newValue }));
     try {
       const { error } = await supabase.from('perfiles').upsert({
         id: session.user.id,
@@ -180,7 +180,7 @@ export default function ProfilePage() {
       if (error) throw error;
       toast.success(newValue ? 'Filtro PMR Activado' : 'Filtro PMR Desactivado');
     } catch (error) {
-      setPerfil({ ...perfil, requiere_pmr: !newValue }); // rollback
+      setPerfil(prev => ({ ...prev, requiere_pmr: !newValue }));
       toast.error('Error al actualizar preferencias');
     }
   };
@@ -198,7 +198,7 @@ export default function ProfilePage() {
       const avatarUrl = `${publicUrl}?t=${Date.now()}`;
       const { error: updateError } = await supabase.from('perfiles').upsert({ id: session.user.id, avatar_url: avatarUrl });
       if (updateError) throw updateError;
-      setPerfil({ ...perfil, avatar_url: avatarUrl });
+      setPerfil(prev => ({ ...prev, avatar_url: avatarUrl }));
       toast.success('Avatar actualizado');
     } catch (error) {
       toast.error(error.message || 'Error al subir avatar');

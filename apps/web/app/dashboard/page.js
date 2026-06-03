@@ -144,7 +144,7 @@ export default function DashboardPage() {
       });
 
       if (result.success && result.data) {
-        setMyParkings([result.data, ...myParkings]);
+        setMyParkings(prev => [result.data, ...prev]);
         setNombre(''); setDireccion(''); setLat(''); setLng(''); setTotalSpots(1); setEsPmr(false);
         showToast('¡Espacio creado y guardado en Supabase DB!', 'success');
       }
@@ -158,7 +158,7 @@ export default function DashboardPage() {
     if (newOccupied < 0 || newOccupied > total) return;
     
     // Optimistic Update
-    setMyParkings(myParkings.map(p => p.id === id ? { ...p, occupied_spots: newOccupied } : p));
+    setMyParkings(prev => prev.map(p => p.id === id ? { ...p, occupied_spots: newOccupied } : p));
     showToast('Sincronizando cupos...', 'syncing');
 
     try {
@@ -169,16 +169,15 @@ export default function DashboardPage() {
         throw new Error(res.error);
       }
     } catch (error) {
-      // Revertir si falla
-      setMyParkings(myParkings.map(p => p.id === id ? { ...p, occupied_spots: currentOccupied } : p));
+      setMyParkings(prev => prev.map(p => p.id === id ? { ...p, occupied_spots: currentOccupied } : p));
       showToast('Error al actualizar en DB', 'error');
     }
   };
 
   const toggleSelection = (id) =>
-    selectedIds.includes(id)
-      ? setSelectedIds(selectedIds.filter(i => i !== id))
-      : setSelectedIds([...selectedIds, id]);
+    setSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
 
   const selectAll = () =>
     selectedIds.length === myParkings.length
@@ -199,7 +198,7 @@ export default function DashboardPage() {
     try {
       const result = await api.mapas.eliminarEstacionamientos(selectedIds);
       if (result.success) {
-        setMyParkings(myParkings.filter(p => !selectedIds.includes(p.id)));
+        setMyParkings(prev => prev.filter(p => !selectedIds.includes(p.id)));
         setSelectedIds([]);
         showToast(`${selectedIds.length} estacionamiento(s) eliminado(s) de Supabase.`, 'success');
       }
@@ -558,7 +557,7 @@ export default function DashboardPage() {
         .empty-state i { font-size: 3rem; margin-bottom: 20px; opacity: 0.5; }
         .empty-state p { font-weight: 700; }
         
-        .parking-list { display: flex; flexDirection: column; gap: 15px; }
+        .parking-list { display: flex; flex-direction: column; gap: 15px; }
         .parking-item { display: flex; justify-content: space-between; align-items: center; padding: 20px; transition: 0.3s; }
         .parking-item.selected { border-color: #ef4444; background: rgba(239, 68, 68, 0.05); }
         .parking-item:hover { transform: translateX(5px); }

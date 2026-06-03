@@ -44,6 +44,14 @@ export default function MiniMap({ lat, lng, setLat, setLng }) {
         markerRef.current = L.marker([clickLat, clickLng], { icon: pinIcon }).addTo(mapInstance.current);
       }
     });
+
+    return () => {
+      if (mapInstance.current) {
+        mapInstance.current.remove();
+        mapInstance.current = null;
+      }
+      markerRef.current = null;
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Cuando lat/lng cambian desde fuera (búsqueda de dirección), mover el mapa

@@ -151,7 +151,11 @@ export default function Map({
       });
     });
 
-    return () => {}; // Evitamos limpieza total en unmount
+    return () => {
+      if (window.__markerLayer) { window.__markerLayer.clearLayers(); }
+      if (window.__radarCircle) { window.__radarCircle.remove(); window.__radarCircle = null; }
+      if (window.__radarPulse) { window.__radarPulse.remove(); window.__radarPulse = null; }
+    };
   }, [location, isLoading, parkings, onSpotSelect, radius, filters]);
 
   // 3. Reactividad estricta del Live Avatar Marker
