@@ -3,6 +3,7 @@ import { api } from '../lib/api';
 import { useRouter } from 'next/navigation';
 import { useGeolocation } from './useGeolocation';
 import { supabase } from '@parkings/supabase-db';
+import { toast } from 'react-hot-toast';
 
 export function useMapRadar() {
   const { location: userLoc, locationSource, isLoading: isLocating, error: locError, userProfile } = useGeolocation();
@@ -15,8 +16,9 @@ export function useMapRadar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const [isReserving, setIsReserving] = useState(false);
-  const [reserveStep, setReserveStep] = useState(0); 
+  const [reserveStep, setReserveStep] = useState(0);
   const [reserveError, setReserveError] = useState(null);
+  const [tempLocks, setTempLocks] = useState(new Set());
 
   const router = useRouter();
 
@@ -83,30 +85,55 @@ export function useMapRadar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [radius, userLoc.lat, userLoc.lng]);
 
-  const handleReserve = async () => {
-    // Use Supabase session instead of localStorage
+  // ── Realtime subscription for spot_locks on current selectedSpot parking ──
+  useEffect(() => {
+    if (!selectedSpot) { setTempLocks(new Set()); return; }
+
+    const load = async () => {
+      try {
+        const res = await fetch(`/api/mapas/locks?estacionamientoId=${selectedSpot.id}`);
+        const data = await res.json();
+        if (data.success) setTempLocks(new Set((data.data || []).map(l => l.spot_label)));
+      } catch { /* ignore */ }
+    };
+
+    load();
+    const channel = supabase.channel(`spot-locks-${selectedSpot.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'spot_locks', filter: `estacionamiento_id=eq.${selectedSpot.id}` }, load)
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, [selectedSpot?.id]);
+
+  const handleReserve = async ({ spotLabel, durationHours = 1 } = {}) => {
     const { data: { session: authSession } } = await supabase.auth.getSession();
     if (!authSession?.user) {
       router.push('/auth');
-      return;
+      return { success: false, error: 'No autenticado.' };
     }
 
     setIsReserving(true);
     setReserveError(null);
-    setReserveStep(1); 
+    setReserveStep(1);
 
     try {
       const check = await api.reservas.verificarDisponibilidad(selectedSpot.id);
       if (!check.success || !check.available) {
-        throw new Error('El nodo ya no está disponible o está lleno.');
+        throw new Error('El estacionamiento ya no está disponible o está lleno.');
       }
 
       setReserveStep(2);
 
+      const fecha_inicio = new Date().toISOString();
+      const fecha_fin = new Date(Date.now() + durationHours * 3600 * 1000).toISOString();
+
       const resData = await api.reservas.crearReserva({
         parking_id: selectedSpot.id,
         user_id: authSession.user.id,
-        duration_hours: 1
+        spot_label: spotLabel,
+        duration_hours: durationHours,
+        fecha_inicio,
+        fecha_fin,
       });
 
       if (!resData.success) {
@@ -114,25 +141,27 @@ export function useMapRadar() {
       }
 
       setReserveStep(3);
-      loadParkings();
+      loadParkings(radius, userLoc.lat, userLoc.lng);
 
       setTimeout(() => {
         setIsReserving(false);
         setReserveStep(0);
-        setSelectedSpot(null); 
+        setSelectedSpot(null);
       }, 3000);
 
+      toast.success('¡Plaza reservada con éxito!');
+      return { success: true };
     } catch (err) {
       setReserveError(err.message);
-      setTimeout(() => {
-        setIsReserving(false);
-        setReserveStep(0);
-      }, 3000);
+      setIsReserving(false);
+      setReserveStep(0);
+      toast.error(err.message || 'No se pudo completar la reserva.');
+      return { success: false, error: err.message };
     }
   };
 
   return {
-    state: { userLoc, locationSource, parkings, radius, sortOption, selectedSpot, loading, isCloud, mobileMenuOpen, isReserving, reserveStep, reserveError, userProfile },
+    state: { userLoc, locationSource, parkings, radius, sortOption, selectedSpot, loading, isCloud, mobileMenuOpen, isReserving, reserveStep, reserveError, userProfile, tempLocks },
     actions: { setRadius, setSortOption, setSelectedSpot, setMobileMenuOpen, handleReserve, setParkingsOverride: setParkings }
   };
 }

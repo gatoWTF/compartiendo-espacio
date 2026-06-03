@@ -23,6 +23,7 @@ export default function MapaPageContainer() {
 
   // ── Selector de plaza ──
   const [selectorOpen, setSelectorOpen] = useState(false);
+  const [authToken, setAuthToken] = useState(null);
 
   // ── Favoritos ──
   const [favIds, setFavIds] = useState(new Set());
@@ -31,6 +32,7 @@ export default function MapaPageContainer() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) return;
+      setAuthToken(session.access_token);
       api.favoritos.listar().then(res => {
         if (res.success) {
           setFavIds(new Set(res.data.map(f => f.estacionamiento?.id ?? f.estacionamiento_id)));
@@ -274,80 +276,106 @@ export default function MapaPageContainer() {
       </div>
 
       {/* ── PANEL DE INFORMACIÓN ── */}
-      {state.selectedSpot && !selectorOpen && (
-        <div className={`glass-panel-strict reservation-panel ${state.selectedSpot ? 'slide-in' : ''}`}>
-          <div className="res-header">
-            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <i className="fa-solid fa-square-parking" style={{ color: '#3b82f6' }}></i>
-              {state.selectedSpot.nombre}
-            </h3>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <button
-                className="btn-close-strict"
-                onClick={() => toggleFavorito(state.selectedSpot)}
-                disabled={favLoading}
-                title={favIds.has(state.selectedSpot.id) ? 'Quitar de favoritos' : 'Añadir a favoritos'}
-                aria-label={favIds.has(state.selectedSpot.id) ? 'Quitar de favoritos' : 'Añadir a favoritos'}
-                style={{ color: favIds.has(state.selectedSpot.id) ? '#f59e0b' : '#64748b', fontSize: '1.1rem' }}
-              >
-                <i className={`fa-${favIds.has(state.selectedSpot.id) ? 'solid' : 'regular'} fa-star`}></i>
-              </button>
-              <button className="btn-close-strict" aria-label="Cerrar panel" onClick={() => actions.setSelectedSpot(null)}>
-                <i className="fa-solid fa-xmark"></i>
-              </button>
-            </div>
-          </div>
+      {state.selectedSpot && !selectorOpen && (() => {
+        const totalSpots = state.selectedSpot.total_spots || 10;
+        const occupiedSpots = state.selectedSpot.occupied_spots || 0;
+        const availableSpots = Math.max(totalSpots - occupiedSpots, 0);
+        const isFull = availableSpots === 0;
 
-          <div className="res-body">
-            <p className="res-row">
-              <i className="fa-solid fa-user-tie" style={{ color: '#64748b', width: '16px' }}></i>
-              <span style={{ color: '#cbd5e1' }}>{state.selectedSpot.arrendador || 'Red P2P'}</span>
-            </p>
-            <p className="res-row">
-              <i className="fa-solid fa-car" style={{ color: '#64748b', width: '16px' }}></i>
-              <span style={{ color: '#10b981', fontWeight: 700 }}>
-                {(state.selectedSpot.total_spots || 10) - (state.selectedSpot.occupied_spots || 0)} disponibles
-              </span>
-              <span style={{ color: '#475569', fontSize: '0.8rem' }}>/ {state.selectedSpot.total_spots || 10} totales</span>
-            </p>
-            {state.selectedSpot.precio_hora !== undefined && (
-              <p className="res-row">
-                <i className="fa-solid fa-coins" style={{ color: '#64748b', width: '16px' }}></i>
-                <span style={{ color: '#f59e0b', fontWeight: 700 }}>
-                  {state.selectedSpot.precio_hora === 0 ? 'Gratuito' : `$${state.selectedSpot.precio_hora?.toLocaleString()}/hr`}
-                </span>
-              </p>
-            )}
-            {state.selectedSpot.comuna && (
-              <p className="res-row">
-                <i className="fa-solid fa-location-dot" style={{ color: '#64748b', width: '16px' }}></i>
-                <span style={{ color: '#94a3b8' }}>{state.selectedSpot.comuna}</span>
-              </p>
-            )}
-            {state.selectedSpot.es_pmr && (
-              <div className="pmr-badge-strict" style={{ marginTop: '8px' }}>
-                <i className="fa-solid fa-wheelchair"></i> Accesibilidad PMR Habilitada
+        return (
+          <div className={`glass-panel-strict reservation-panel ${state.selectedSpot ? 'slide-in' : ''}`}>
+            <div className="res-header">
+              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <i className="fa-solid fa-square-parking" style={{ color: '#3b82f6' }}></i>
+                {state.selectedSpot.nombre}
+              </h3>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button
+                  className="btn-close-strict"
+                  onClick={() => toggleFavorito(state.selectedSpot)}
+                  disabled={favLoading}
+                  title={favIds.has(state.selectedSpot.id) ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+                  aria-label={favIds.has(state.selectedSpot.id) ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+                  style={{ color: favIds.has(state.selectedSpot.id) ? '#f59e0b' : '#64748b', fontSize: '1.1rem' }}
+                >
+                  <i className={`fa-${favIds.has(state.selectedSpot.id) ? 'solid' : 'regular'} fa-star`}></i>
+                </button>
+                <button className="btn-close-strict" aria-label="Cerrar panel" onClick={() => actions.setSelectedSpot(null)}>
+                  <i className="fa-solid fa-xmark"></i>
+                </button>
               </div>
-            )}
+            </div>
 
-            <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-              {state.reserveError && (
-                <div style={{ color: '#f87171', fontSize: '0.82rem', padding: '8px 12px', background: 'rgba(239,68,68,0.08)', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.2)', marginBottom: '10px', textAlign: 'center' }}>
-                  {state.reserveError}
+            <div className="res-body">
+              <p className="res-row">
+                <i className="fa-solid fa-user-tie" style={{ color: '#64748b', width: '16px' }}></i>
+                <span style={{ color: '#cbd5e1' }}>{state.selectedSpot.arrendador || 'Red P2P'}</span>
+              </p>
+              <p className="res-row">
+                <i className="fa-solid fa-car" style={{ color: isFull ? '#ef4444' : '#10b981', width: '16px' }}></i>
+                <span style={{ color: isFull ? '#ef4444' : '#10b981', fontWeight: 700 }}>
+                  {availableSpots} disponibles
+                </span>
+                <span style={{ color: '#475569', fontSize: '0.8rem' }}>/ {totalSpots} totales</span>
+              </p>
+              {state.selectedSpot.precio_hora !== undefined && (
+                <p className="res-row">
+                  <i className="fa-solid fa-coins" style={{ color: '#64748b', width: '16px' }}></i>
+                  <span style={{ color: '#f59e0b', fontWeight: 700 }}>
+                    {state.selectedSpot.precio_hora === 0 ? 'Gratuito' : `$${state.selectedSpot.precio_hora?.toLocaleString()}/hr`}
+                  </span>
+                </p>
+              )}
+              {state.selectedSpot.comuna && (
+                <p className="res-row">
+                  <i className="fa-solid fa-location-dot" style={{ color: '#64748b', width: '16px' }}></i>
+                  <span style={{ color: '#94a3b8' }}>{state.selectedSpot.comuna}</span>
+                </p>
+              )}
+              {state.selectedSpot.es_pmr && (
+                <div className="pmr-badge-strict" style={{ marginTop: '8px' }}>
+                  <i className="fa-solid fa-wheelchair"></i> Accesibilidad PMR Habilitada
                 </div>
               )}
-              <button
-                className="btn-reserve-strict"
-                onClick={() => setSelectorOpen(true)}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', fontSize: '0.9rem', letterSpacing: '0.5px' }}
-              >
-                <i className="fa-solid fa-border-all"></i>
-                ELEGIR PLAZA
-              </button>
+
+              <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                {state.reserveError && (
+                  <div style={{ color: '#f87171', fontSize: '0.82rem', padding: '8px 12px', background: 'rgba(239,68,68,0.08)', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.2)', marginBottom: '10px', textAlign: 'center' }}>
+                    {state.reserveError}
+                  </div>
+                )}
+                <button
+                  className="btn-reserve-strict"
+                  disabled={isFull}
+                  onClick={() => !isFull && setSelectorOpen(true)}
+                  aria-label={isFull ? 'Sin disponibilidad' : 'Elegir plaza'}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '10px',
+                    fontSize: '0.9rem',
+                    letterSpacing: '0.5px',
+                    ...(isFull ? {
+                      background: 'rgba(255,255,255,0.05)',
+                      color: '#475569',
+                      cursor: 'not-allowed',
+                      opacity: 0.5,
+                      pointerEvents: 'none',
+                      border: '1px solid rgba(255,255,255,0.06)',
+                    } : {}),
+                  }}
+                >
+                  {isFull
+                    ? <><i className="fa-solid fa-ban"></i> Sin disponibilidad</>
+                    : <><i className="fa-solid fa-border-all"></i> ELEGIR PLAZA</>
+                  }
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── MODAL SELECTOR DE PLAZA ── */}
       {selectorOpen && state.selectedSpot && (
@@ -355,6 +383,8 @@ export default function MapaPageContainer() {
           parking={state.selectedSpot}
           isReserving={state.isReserving}
           onReserve={actions.handleReserve}
+          tempLocks={state.tempLocks}
+          authToken={authToken}
           onClose={() => {
             setSelectorOpen(false);
             actions.setSelectedSpot(null);
