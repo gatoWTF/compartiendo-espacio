@@ -29,7 +29,10 @@ export async function middleware(request) {
 
     // Verificar que el token no esté expirado (check rápido sin llamada de red)
     const [, payload] = accessToken.split('.');
-    const { exp } = JSON.parse(Buffer.from(payload, 'base64').toString());
+    // JWT uses base64url (RFC 4648 §5): replace - → + and _ → /, then pad to multiple of 4
+    const b64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = b64.padEnd(b64.length + (4 - b64.length % 4) % 4, '=');
+    const { exp } = JSON.parse(Buffer.from(padded, 'base64').toString());
     if (Date.now() / 1000 > exp) throw new Error('Token expired');
 
     return NextResponse.next();

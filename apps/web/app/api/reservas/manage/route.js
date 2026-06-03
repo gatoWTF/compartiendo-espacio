@@ -30,19 +30,27 @@ export async function GET(request) {
     const scope = searchParams.get('scope') || 'conductor';
     const db = getSupabaseWithToken(token);
 
-    // Las políticas RLS de `reservas` ya restringen lo que cada usuario ve:
-    //  - conductor: sus propias reservas (reservas_select_conductor)
-    //  - arrendador: reservas de sus estacionamientos (reservas_select_arrendador)
-    // Traemos también datos del estacionamiento para la UI.
+    const { data: { user } } = await db.auth.getUser();
+    if (!user) return NextResponse.json({ success: false, error: 'Sesión inválida.' }, { status: 401 });
+
     let query = db
       .from('reservas')
       .select('*, estacionamiento:estacionamientos(id, nombre, comuna, precio_hora, lat, lng)')
       .order('fecha_inicio', { ascending: false, nullsFirst: false });
 
+    if (scope === 'conductor') {
+      query = query.eq('conductor_id', user.id);
+    } else if (scope === 'arrendador') {
+      // Get all parking IDs owned by this user
+      const { data: mis } = await db.from('estacionamientos').select('id').eq('user_id', user.id);
+      const ids = (mis || []).map(p => p.id);
+      if (ids.length === 0) return NextResponse.json({ success: true, scope, data: [] }, { status: 200 });
+      query = query.in('estacionamiento_id', ids);
+    }
+
     const { data, error } = await query;
     if (error) return NextResponse.json({ success: false, error: error.message, data: [] }, { status: 500 });
 
-    // Filtro defensivo por scope (RLS ya acota, esto solo ordena la vista).
     return NextResponse.json({ success: true, scope, data: data || [] }, { status: 200 });
   } catch (err) {
     return NextResponse.json({ success: false, error: err.message, data: [] }, { status: 500 });

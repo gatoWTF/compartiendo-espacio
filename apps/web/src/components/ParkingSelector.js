@@ -39,7 +39,8 @@ function calcTotal(days, hours, mins, parking) {
   }
   if (remaining > 0) {
     if (pMin)       total += remaining * pMin;
-    else if (pHour) total += pHour; // round up to next hour
+    else if (pHour) total += pHour;       // round up to next hour
+    else if (pDay)  total += pDay;        // only day rate: round up to next day
   }
 
   return Math.round(total);
@@ -70,6 +71,8 @@ function calcBreakdown(days, hours, mins, parking) {
       lines.push({ label: `${remaining} min`, rate: `$${pMin.toLocaleString()}/min`, sub: remaining * pMin });
     } else if (pHour) {
       lines.push({ label: `${remaining} min (redondeo a 1h)`, rate: `$${pHour.toLocaleString()}/hr`, sub: pHour });
+    } else if (pDay) {
+      lines.push({ label: `${remaining} min (redondeo a 1 día)`, rate: `$${pDay.toLocaleString()}/día`, sub: pDay });
     }
   }
   return lines;
