@@ -6,6 +6,7 @@ import { supabase } from '@parkings/supabase-db';
 import dynamic from 'next/dynamic';
 
 const Map = dynamic(() => import('../../src/components/Map'), { ssr: false });
+const ParkingSelector = dynamic(() => import('../../src/components/ParkingSelector'), { ssr: false });
 
 export default function MapaPageContainer() {
   const { state, actions } = useMapRadar();
@@ -19,6 +20,9 @@ export default function MapaPageContainer() {
   const [searchPmr, setSearchPmr] = useState(false);
   const [searchDisponible, setSearchDisponible] = useState(false);
   const [searchPrecioMax, setSearchPrecioMax] = useState('');
+
+  // ── Selector de plaza ──
+  const [selectorOpen, setSelectorOpen] = useState(false);
 
   // ── Favoritos ──
   const [favIds, setFavIds] = useState(new Set());
@@ -269,11 +273,14 @@ export default function MapaPageContainer() {
         )}
       </div>
 
-      {/* ── PANEL DE RESERVA ── */}
-      {state.selectedSpot && (
+      {/* ── PANEL DE INFORMACIÓN ── */}
+      {state.selectedSpot && !selectorOpen && (
         <div className={`glass-panel-strict reservation-panel ${state.selectedSpot ? 'slide-in' : ''}`}>
           <div className="res-header">
-            <h3><i className="fa-solid fa-square-parking text-blue-500 mr-2"></i> {state.selectedSpot.nombre}</h3>
+            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <i className="fa-solid fa-square-parking" style={{ color: '#3b82f6' }}></i>
+              {state.selectedSpot.nombre}
+            </h3>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <button
                 className="btn-close-strict"
@@ -290,50 +297,69 @@ export default function MapaPageContainer() {
               </button>
             </div>
           </div>
-          
+
           <div className="res-body">
-            <p className="res-row"><i className="fa-solid fa-user-tie"></i> <span>{state.selectedSpot.arrendador || 'Red P2P'}</span></p>
             <p className="res-row">
-              <i className="fa-solid fa-car"></i> 
-              <span className="text-green-500 font-bold">
-                {(state.selectedSpot.total_spots || 10) - (state.selectedSpot.occupied_spots || 0)} disp.
+              <i className="fa-solid fa-user-tie" style={{ color: '#64748b', width: '16px' }}></i>
+              <span style={{ color: '#cbd5e1' }}>{state.selectedSpot.arrendador || 'Red P2P'}</span>
+            </p>
+            <p className="res-row">
+              <i className="fa-solid fa-car" style={{ color: '#64748b', width: '16px' }}></i>
+              <span style={{ color: '#10b981', fontWeight: 700 }}>
+                {(state.selectedSpot.total_spots || 10) - (state.selectedSpot.occupied_spots || 0)} disponibles
               </span>
+              <span style={{ color: '#475569', fontSize: '0.8rem' }}>/ {state.selectedSpot.total_spots || 10} totales</span>
             </p>
             {state.selectedSpot.precio_hora !== undefined && (
-              <p className="res-row"><i className="fa-solid fa-coins"></i> <span className="text-yellow-500 font-bold">
-                {state.selectedSpot.precio_hora === 0 ? 'Gratuito' : `$${state.selectedSpot.precio_hora?.toLocaleString()}/hr`}
-              </span></p>
+              <p className="res-row">
+                <i className="fa-solid fa-coins" style={{ color: '#64748b', width: '16px' }}></i>
+                <span style={{ color: '#f59e0b', fontWeight: 700 }}>
+                  {state.selectedSpot.precio_hora === 0 ? 'Gratuito' : `$${state.selectedSpot.precio_hora?.toLocaleString()}/hr`}
+                </span>
+              </p>
+            )}
+            {state.selectedSpot.comuna && (
+              <p className="res-row">
+                <i className="fa-solid fa-location-dot" style={{ color: '#64748b', width: '16px' }}></i>
+                <span style={{ color: '#94a3b8' }}>{state.selectedSpot.comuna}</span>
+              </p>
             )}
             {state.selectedSpot.es_pmr && (
-              <div className="pmr-badge-strict mt-3">
+              <div className="pmr-badge-strict" style={{ marginTop: '8px' }}>
                 <i className="fa-solid fa-wheelchair"></i> Accesibilidad PMR Habilitada
               </div>
             )}
 
-            <div className="mt-5 pt-4 border-t border-white/10">
-              {state.reserveStep === 0 && (
-                <button className="btn-reserve-strict" onClick={actions.handleReserve}>
-                  SOLICITAR ESPACIO
-                </button>
-              )}
-              {state.reserveStep > 0 && state.reserveStep < 3 && (
-                <div className="text-center text-sm text-slate-300 py-3 animate-pulse">
-                  <i className="fa-solid fa-circle-notch fa-spin text-blue-500 mr-2"></i> Procesando transacción...
-                </div>
-              )}
-              {state.reserveStep === 3 && (
-                <div className="text-center text-sm text-green-500 font-bold py-3 bg-green-500/10 rounded-lg border border-green-500/20">
-                  <i className="fa-solid fa-circle-check mr-2"></i> ¡Match Exitoso!
-                </div>
-              )}
+            <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
               {state.reserveError && (
-                <div className="text-center text-sm text-red-400 py-3 bg-red-500/10 rounded-lg mt-2 border border-red-500/20">
+                <div style={{ color: '#f87171', fontSize: '0.82rem', padding: '8px 12px', background: 'rgba(239,68,68,0.08)', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.2)', marginBottom: '10px', textAlign: 'center' }}>
                   {state.reserveError}
                 </div>
               )}
+              <button
+                className="btn-reserve-strict"
+                onClick={() => setSelectorOpen(true)}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', fontSize: '0.9rem', letterSpacing: '0.5px' }}
+              >
+                <i className="fa-solid fa-border-all"></i>
+                ELEGIR PLAZA
+              </button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── MODAL SELECTOR DE PLAZA ── */}
+      {selectorOpen && state.selectedSpot && (
+        <ParkingSelector
+          parking={state.selectedSpot}
+          isReserving={state.isReserving}
+          onReserve={actions.handleReserve}
+          onClose={() => {
+            setSelectorOpen(false);
+            actions.setSelectedSpot(null);
+          }}
+        />
       )}
 
       <style jsx>{`

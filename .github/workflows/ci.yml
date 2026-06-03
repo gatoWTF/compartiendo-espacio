@@ -2,7 +2,7 @@ name: CI Pipeline - Parking's Together (Enterprise)
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "master", "claude/**" ]
   pull_request:
     branches: [ "master" ]
 
