@@ -1,19 +1,50 @@
--- 008_favoritos_resenas.sql
--- Favoritos + Calificaciones/Reseñas (historial de uso se deriva de `reservas`).
--- Idempotente. Ejecutar en Supabase → SQL Editor DESPUÉS de 007.
+-- 008_favoritos_resenas.sql  (v2 — compatible con id integer O uuid)
+-- Favoritos + Calificaciones/Reseñas.
+-- Detecta en runtime el tipo real de estacionamientos.id y lo replica
+-- en favoritos.estacionamiento_id para que el FK siempre sea compatible.
+-- Idempotente. Ejecutar DESPUÉS de 005/006/007.
 
 BEGIN;
 
 -- ============================================================================
--- 1) FAVORITOS  (conductor ↔ estacionamiento)
+-- 0) Averiguar el tipo real de estacionamientos.id (integer en producción)
 -- ============================================================================
-CREATE TABLE IF NOT EXISTS public.favoritos (
-  id              uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id         uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  estacionamiento_id uuid NOT NULL REFERENCES public.estacionamientos(id) ON DELETE CASCADE,
-  created_at      timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (user_id, estacionamiento_id)
-);
+DO $$
+DECLARE
+  v_id_type text;
+  v_ddl     text;
+BEGIN
+  SELECT data_type INTO v_id_type
+  FROM information_schema.columns
+  WHERE table_schema = 'public'
+    AND table_name   = 'estacionamientos'
+    AND column_name  = 'id';
+
+  -- Sólo crear la tabla si no existe todavía
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'favoritos'
+  ) THEN
+    -- Construir DDL dinámico con el tipo correcto para la FK
+    v_ddl := format(
+      $sql$
+        CREATE TABLE public.favoritos (
+          id                  uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+          user_id             uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+          estacionamiento_id  %s  NOT NULL REFERENCES public.estacionamientos(id) ON DELETE CASCADE,
+          created_at          timestamptz NOT NULL DEFAULT now(),
+          UNIQUE (user_id, estacionamiento_id)
+        );
+      $sql$,
+      v_id_type
+    );
+    EXECUTE v_ddl;
+    RAISE NOTICE 'Tabla favoritos creada con estacionamiento_id de tipo %', v_id_type;
+  ELSE
+    RAISE NOTICE 'Tabla favoritos ya existe — se omite la creación.';
+  END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_favoritos_user ON public.favoritos (user_id);
 
 ALTER TABLE public.favoritos ENABLE ROW LEVEL SECURITY;
@@ -31,36 +62,38 @@ CREATE POLICY "favoritos_delete_own" ON public.favoritos
   FOR DELETE USING (auth.uid() = user_id);
 
 -- ============================================================================
--- 2) CALIFICACIONES / RESEÑAS  (sobre una reserva ya completada)
+-- 1) CALIFICACIONES / RESEÑAS  (sobre una reserva ya completada)
 -- ============================================================================
 ALTER TABLE public.reservas
-  ADD COLUMN IF NOT EXISTS calificacion int,
-  ADD COLUMN IF NOT EXISTS comentario   text,
-  ADD COLUMN IF NOT EXISTS calificada_at timestamptz;
+  ADD COLUMN IF NOT EXISTS calificacion   int,
+  ADD COLUMN IF NOT EXISTS comentario     text,
+  ADD COLUMN IF NOT EXISTS calificada_at  timestamptz;
 
 ALTER TABLE public.reservas DROP CONSTRAINT IF EXISTS reservas_calificacion_rango;
 ALTER TABLE public.reservas
   ADD CONSTRAINT reservas_calificacion_rango
   CHECK (calificacion IS NULL OR calificacion BETWEEN 1 AND 5);
 
--- Asegurar columnas de agregado en estacionamientos (en prod ya existen, idempotente).
+-- Columnas de agregado en estacionamientos (en prod ya existen → idempotente).
 ALTER TABLE public.estacionamientos
-  ADD COLUMN IF NOT EXISTS rating numeric DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS reviews_count int DEFAULT 0;
+  ADD COLUMN IF NOT EXISTS rating        numeric DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS reviews_count int     DEFAULT 0;
 
--- RPC: calificar una reserva propia y recomputar el agregado del estacionamiento.
+-- ============================================================================
+-- 2) RPC: calificar una reserva propia y recomputar rating del estacionamiento
+-- ============================================================================
 CREATE OR REPLACE FUNCTION public.calificar_reserva(
-  p_reserva_id uuid,
+  p_reserva_id   uuid,
   p_calificacion int,
-  p_comentario text DEFAULT NULL
+  p_comentario   text DEFAULT NULL
 )
 RETURNS public.reservas
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
-  v_uid uuid := auth.uid();
+  v_uid    uuid := auth.uid();
   v_reserva public.reservas%ROWTYPE;
-  v_avg numeric;
-  v_cnt int;
+  v_avg    numeric;
+  v_cnt    int;
 BEGIN
   IF v_uid IS NULL THEN RAISE EXCEPTION 'No autenticado'; END IF;
   IF p_calificacion < 1 OR p_calificacion > 5 THEN
@@ -77,18 +110,21 @@ BEGIN
   END IF;
 
   UPDATE public.reservas
-    SET calificacion = p_calificacion, comentario = p_comentario, calificada_at = now()
+    SET calificacion  = p_calificacion,
+        comentario    = p_comentario,
+        calificada_at = now()
     WHERE id = p_reserva_id
     RETURNING * INTO v_reserva;
 
-  -- Recomputar agregado del estacionamiento.
   SELECT ROUND(AVG(calificacion)::numeric, 2), COUNT(*)
     INTO v_avg, v_cnt
     FROM public.reservas
-    WHERE estacionamiento_id = v_reserva.estacionamiento_id AND calificacion IS NOT NULL;
+    WHERE estacionamiento_id = v_reserva.estacionamiento_id
+      AND calificacion IS NOT NULL;
 
   UPDATE public.estacionamientos
-    SET rating = COALESCE(v_avg, 0), reviews_count = COALESCE(v_cnt, 0)
+    SET rating        = COALESCE(v_avg, 0),
+        reviews_count = COALESCE(v_cnt, 0)
     WHERE id = v_reserva.estacionamiento_id;
 
   RETURN v_reserva;
@@ -97,20 +133,25 @@ END; $$;
 REVOKE ALL ON FUNCTION public.calificar_reserva(uuid,int,text) FROM public, anon;
 GRANT EXECUTE ON FUNCTION public.calificar_reserva(uuid,int,text) TO authenticated;
 
--- RPC: completar una reserva (arrendador del espacio o conductor) ------------
+-- ============================================================================
+-- 3) RPC: completar una reserva (arrendador del espacio o el propio conductor)
+-- ============================================================================
 CREATE OR REPLACE FUNCTION public.completar_reserva(p_reserva_id uuid)
 RETURNS public.reservas
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
-  v_uid uuid := auth.uid();
+  v_uid    uuid := auth.uid();
   v_reserva public.reservas%ROWTYPE;
-  v_owner uuid;
+  v_owner  uuid;
 BEGIN
   IF v_uid IS NULL THEN RAISE EXCEPTION 'No autenticado'; END IF;
+
   SELECT * INTO v_reserva FROM public.reservas WHERE id = p_reserva_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'Reserva no encontrada'; END IF;
 
-  SELECT user_id INTO v_owner FROM public.estacionamientos WHERE id = v_reserva.estacionamiento_id;
+  SELECT user_id INTO v_owner
+    FROM public.estacionamientos WHERE id = v_reserva.estacionamiento_id;
+
   IF v_reserva.conductor_id <> v_uid AND v_owner IS DISTINCT FROM v_uid THEN
     RAISE EXCEPTION 'No autorizado';
   END IF;
@@ -118,8 +159,10 @@ BEGIN
     RAISE EXCEPTION 'Solo se completan reservas confirmadas o activas';
   END IF;
 
-  UPDATE public.reservas SET estado = 'completada' WHERE id = p_reserva_id
+  UPDATE public.reservas SET estado = 'completada'
+    WHERE id = p_reserva_id
     RETURNING * INTO v_reserva;
+
   RETURN v_reserva;
 END; $$;
 
@@ -128,6 +171,7 @@ GRANT EXECUTE ON FUNCTION public.completar_reserva(uuid) TO authenticated;
 
 COMMIT;
 
--- Verificación:
--- SELECT count(*) FROM public.favoritos;
+-- Verificación (ejecutar por separado):
+-- SELECT column_name, data_type FROM information_schema.columns
+--   WHERE table_schema='public' AND table_name='favoritos';
 -- SELECT id, estado, calificacion FROM public.reservas LIMIT 5;
