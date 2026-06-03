@@ -104,12 +104,12 @@ export default function ProfilePage() {
         if (vehiculosError) throw vehiculosError;
         if (vehiculosData) setVehiculos(vehiculosData);
       } catch (vehiculosErr) {
-        console.error('Error cargando vehículos (puede no existir la tabla):', vehiculosErr);
+        if (process.env.NODE_ENV === 'development') console.error('Error cargando vehículos (puede no existir la tabla):', vehiculosErr);
         setVehiculos([]);
       }
 
     } catch (error) {
-      console.error(error);
+      if (process.env.NODE_ENV === 'development') console.error(error);
       toast.error('Error al cargar datos del perfil');
     } finally {
       setLoading(false);

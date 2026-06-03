@@ -60,7 +60,7 @@ export default function DashboardPage() {
         const { data: profileData } = await supabase.from('perfiles').select('rol, nombre').eq('id', authSession.user.id).single();
         profile = profileData;
       } catch (e) {
-        console.warn('[Dashboard] Perfil no disponible, usando fallback de auth metadata');
+        if (process.env.NODE_ENV === 'development') console.warn('[Dashboard] Perfil no disponible, usando fallback de auth metadata');
       }
       
       const userObj = {
@@ -84,7 +84,7 @@ export default function DashboardPage() {
           const rr = await api.reservas.listar('arrendador');
           if (rr.success) setReservasRecibidas(rr.data || []);
         } catch (e) {
-          console.error('Error cargando reservas recibidas:', e);
+          if (process.env.NODE_ENV === 'development') console.error('Error cargando reservas recibidas:', e);
         }
       }
 
@@ -404,11 +404,11 @@ export default function DashboardPage() {
             </h3>
             {myParkings.length > 0 && session?.user?.rol === 'arrendador' && (
               <div className="inventory-actions">
-                <button onClick={selectAll} className="btn-cyber-secondary action-btn">
+                <button onClick={selectAll} className="btn-cyber-secondary action-btn" aria-label={selectedIds.length === myParkings.length ? 'Desmarcar todos' : 'Seleccionar todos'}>
                   {selectedIds.length === myParkings.length ? 'Desmarcar' : 'Seleccionar'}
                 </button>
                 {selectedIds.length > 0 && (
-                  <button onClick={handleBulkDelete} className="btn-delete-bulk">
+                  <button onClick={handleBulkDelete} className="btn-delete-bulk" aria-label={`Borrar ${selectedIds.length} estacionamiento(s) seleccionado(s)`}>
                     <i className="fa-solid fa-trash"></i> Borrar ({selectedIds.length})
                   </button>
                 )}

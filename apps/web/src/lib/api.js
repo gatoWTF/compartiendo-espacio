@@ -51,7 +51,7 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
     return payload ?? { success: true, data: [] };
   } catch (error) {
     clearTimeout(id);
-    console.error(`[BFF Timeout/Error] Falló la petición a ${url}`, error.message);
+    if (process.env.NODE_ENV === 'development') console.error(`[BFF Timeout/Error] Falló la petición a ${url}`, error.message);
     return {
       success: false,
       error: true,

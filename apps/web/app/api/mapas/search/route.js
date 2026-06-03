@@ -68,7 +68,10 @@ export async function GET(request) {
       if (error) {
         return NextResponse.json({ success: false, error: error.message, data: [] }, { status: 500 });
       }
-      return NextResponse.json({ success: true, data: data || [] }, { status: 200 });
+      return NextResponse.json({ success: true, data: data || [] }, {
+        status: 200,
+        headers: { 'Cache-Control': 'public, max-age=20, stale-while-revalidate=60' },
+      });
     }
 
     // Fallback: non-spatial query (userId filter, or no geo params = fetch all)

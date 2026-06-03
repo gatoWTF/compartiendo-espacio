@@ -38,7 +38,7 @@ export default function AuthPage() {
 
   const { register, handleSubmit, formState: { errors }, reset, setValue, watch } = useForm({
     resolver: zodResolver(currentSchema),
-    mode: 'onSubmit',
+    mode: 'onBlur',
     defaultValues: { rol: 'cliente' }
   });
 

@@ -245,17 +245,28 @@ export default function MapaPageContainer() {
       )}
 
       {/* ── ÁREA DEL MAPA ── */}
-      <div className="map-area">
-        <Map 
-          location={state.userLoc} 
-          isLoading={state.loading} 
-          error={state.reserveError} 
-          parkings={state.parkings} 
+      <div className="map-area" style={{ position: 'relative' }}>
+        <Map
+          location={state.userLoc}
+          isLoading={state.loading}
+          error={state.reserveError}
+          parkings={state.parkings}
           onSpotSelect={actions.setSelectedSpot}
           radius={localRadius}
           filters={filters}
           userProfile={state.userProfile}
         />
+        {state.loading && (
+          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 500, textAlign: 'center', pointerEvents: 'none' }}>
+            <i className="fa-solid fa-circle-notch fa-spin" style={{ fontSize: '2rem', color: '#3b82f6', filter: 'drop-shadow(0 0 8px #3b82f6)' }}></i>
+          </div>
+        )}
+        {!state.loading && state.parkings.length === 0 && (
+          <div style={{ position: 'absolute', bottom: '24px', left: '50%', transform: 'translateX(-50%)', zIndex: 500, background: 'rgba(15,23,42,0.9)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '12px 20px', color: '#94a3b8', fontSize: '0.85rem', whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+            <i className="fa-solid fa-radar mr-2" style={{ color: '#3b82f6' }}></i>
+            Sin estacionamientos en este radio — expande el radar
+          </div>
+        )}
       </div>
 
       {/* ── PANEL DE RESERVA ── */}
@@ -269,11 +280,12 @@ export default function MapaPageContainer() {
                 onClick={() => toggleFavorito(state.selectedSpot)}
                 disabled={favLoading}
                 title={favIds.has(state.selectedSpot.id) ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+                aria-label={favIds.has(state.selectedSpot.id) ? 'Quitar de favoritos' : 'Añadir a favoritos'}
                 style={{ color: favIds.has(state.selectedSpot.id) ? '#f59e0b' : '#64748b', fontSize: '1.1rem' }}
               >
                 <i className={`fa-${favIds.has(state.selectedSpot.id) ? 'solid' : 'regular'} fa-star`}></i>
               </button>
-              <button className="btn-close-strict" onClick={() => actions.setSelectedSpot(null)}>
+              <button className="btn-close-strict" aria-label="Cerrar panel" onClick={() => actions.setSelectedSpot(null)}>
                 <i className="fa-solid fa-xmark"></i>
               </button>
             </div>
