@@ -24,9 +24,9 @@ describe('BFF: Timeout y Fallback', () => {
 
   test('Debe abortar la petición y devolver fallback si toma más de 4s', async () => {
     // Simulamos un fetch que se queda colgado pero respeta el AbortSignal
-    global.fetch.mockImplementation((url, options) => {
-      return new Promise((resolve, reject) => {
-        if (options && options.signal) {
+    global.fetch.mockImplementation((_url, options) => {
+      return new Promise((_resolve, reject) => {
+        if (options?.signal) {
           options.signal.addEventListener('abort', () => reject(new Error('AbortError')));
         }
       });
@@ -34,8 +34,8 @@ describe('BFF: Timeout y Fallback', () => {
 
     const promise = api.mapas.getMisEstacionamientos('user-123');
 
-    // Avanzamos el reloj de Jest más de 4 segundos
-    jest.advanceTimersByTime(4500);
+    // Avanzamos el reloj más de 4s y dejamos que todos los microtasks se resuelvan
+    await jest.runAllTimersAsync();
 
     const result = await promise;
 
@@ -43,7 +43,8 @@ describe('BFF: Timeout y Fallback', () => {
       error: true,
       message: 'El servicio está experimentando latencia o no está disponible.',
       data: [],
-      fallback: true
+      fallback: true,
+      success: false,
     });
   });
 });

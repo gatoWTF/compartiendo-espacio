@@ -1,16 +1,72 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useMapRadar } from '../../src/hooks/useMapRadar';
+import { api } from '../../src/lib/api';
+import { supabase } from '@parkings/supabase-db';
 import dynamic from 'next/dynamic';
 
 const Map = dynamic(() => import('../../src/components/Map'), { ssr: false });
+const ParkingSelector = dynamic(() => import('../../src/components/ParkingSelector'), { ssr: false });
 
 export default function MapaPageContainer() {
   const { state, actions } = useMapRadar();
   const [filters, setFilters] = useState({ p2p: false, pmr: false });
-  
-  // Sincronizar el radio local con el global del hook para fluidez
   const [localRadius, setLocalRadius] = useState(state.radius);
+
+  // ── Búsqueda avanzada ──
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQ, setSearchQ] = useState('');
+  const [searchComuna, setSearchComuna] = useState('');
+  const [searchPmr, setSearchPmr] = useState(false);
+  const [searchDisponible, setSearchDisponible] = useState(false);
+  const [searchPrecioMax, setSearchPrecioMax] = useState('');
+
+  // ── Selector de plaza ──
+  const [selectorOpen, setSelectorOpen] = useState(false);
+
+  // ── Favoritos ──
+  const [favIds, setFavIds] = useState(new Set());
+  const [favLoading, setFavLoading] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) return;
+      api.favoritos.listar().then(res => {
+        if (res.success) {
+          setFavIds(new Set(res.data.map(f => f.estacionamiento?.id ?? f.estacionamiento_id)));
+        }
+      });
+    });
+  }, []);
+
+  const toggleFavorito = useCallback(async (spot) => {
+    const id = spot.id;
+    setFavLoading(true);
+    if (favIds.has(id)) {
+      await api.favoritos.quitar(id);
+      setFavIds(prev => { const s = new Set(prev); s.delete(id); return s; });
+    } else {
+      await api.favoritos.agregar(id);
+      setFavIds(prev => new Set(prev).add(id));
+    }
+    setFavLoading(false);
+  }, [favIds]);
+
+  const handleBusquedaAvanzada = () => {
+    // Aplica los filtros de texto/comuna pasando parámetros al hook via URL
+    // El hook useMapRadar ya llama a /api/mapas/search; para búsqueda avanzada
+    // hacemos el fetch directo aquí y lo inyectamos al estado del hook.
+    const filtros = {};
+    if (searchQ) filtros.q = searchQ;
+    if (searchComuna) filtros.comuna = searchComuna;
+    if (searchPmr) filtros.pmr = 'true';
+    if (searchDisponible) filtros.disponible = 'true';
+    if (searchPrecioMax) filtros.precioMax = searchPrecioMax;
+    api.mapas.buscar(filtros).then(res => {
+      if (res.success) actions.setParkingsOverride?.(res.data);
+    });
+    setSearchOpen(false);
+  };
 
   const handleGPS = () => {
     if (navigator.geolocation) {
@@ -43,7 +99,7 @@ export default function MapaPageContainer() {
 
   return (
     <div className="map-page-wrapper">
-      
+
       {/* ── PANEL DE RADAR (Top Left - True Glassmorphism) ── */}
       <div className="radar-overlay">
         <div className="glass-panel-strict">
@@ -51,7 +107,20 @@ export default function MapaPageContainer() {
             <i className="fa-solid fa-satellite-dish pulse-icon text-green-500"></i>
             <span>Radar de Proximidad</span>
           </div>
-          
+
+          {/* Indicador de precisión de ubicación */}
+          {state.locationSource && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px',
+              fontSize: '0.72rem', fontWeight: 600, letterSpacing: '0.5px',
+              color: state.locationSource === 'gps' ? '#10b981' : state.locationSource === 'network' ? '#f59e0b' : '#94a3b8' }}>
+              <i className={`fa-solid fa-${state.locationSource === 'gps' ? 'satellite' : state.locationSource === 'network' ? 'wifi' : 'globe'}`}></i>
+              {state.locationSource === 'gps'     && 'GPS · Alta precisión'}
+              {state.locationSource === 'network' && 'Red · Precisión media'}
+              {state.locationSource === 'ip'      && 'IP · Aproximada — activa el GPS'}
+              {state.locationSource === 'fallback'&& 'Sin ubicación — activa el GPS'}
+            </div>
+          )}
+
           <div className="panel-divider"></div>
 
           {/* Control de Alcance (Slider) */}
@@ -108,78 +177,189 @@ export default function MapaPageContainer() {
           </div>
         </div>
 
-        <button className="btn-gps-strict" onClick={handleGPS} aria-label="Centrar en mi ubicación">
-          <i className="fa-solid fa-location-crosshairs"></i>
-        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <button className="btn-gps-strict" onClick={handleGPS} aria-label="Centrar en mi ubicación">
+            <i className="fa-solid fa-location-crosshairs"></i>
+          </button>
+          <button
+            className="btn-gps-strict"
+            onClick={() => setSearchOpen(o => !o)}
+            aria-label="Búsqueda avanzada"
+            style={searchOpen ? { color: 'white', borderColor: 'rgba(59,130,246,0.5)', background: 'rgba(59,130,246,0.2)' } : {}}
+          >
+            <i className="fa-solid fa-magnifying-glass"></i>
+          </button>
+        </div>
       </div>
 
+      {/* ── PANEL BÚSQUEDA AVANZADA ── */}
+      {searchOpen && (
+        <div className="glass-panel-strict search-panel">
+          <div className="panel-header" style={{ marginBottom: '14px' }}>
+            <i className="fa-solid fa-sliders text-blue-400"></i>
+            <span>Filtros Avanzados</span>
+            <button className="btn-close-strict" style={{ marginLeft: 'auto' }} onClick={() => setSearchOpen(false)}>
+              <i className="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+
+          <input
+            className="search-input"
+            placeholder="Nombre del estacionamiento..."
+            value={searchQ}
+            onChange={e => setSearchQ(e.target.value)}
+          />
+          <input
+            className="search-input"
+            placeholder="Comuna (ej: Providencia)"
+            value={searchComuna}
+            onChange={e => setSearchComuna(e.target.value)}
+            style={{ marginTop: '8px' }}
+          />
+          <input
+            className="search-input"
+            placeholder="Precio máx / hora (CLP)"
+            type="number"
+            value={searchPrecioMax}
+            onChange={e => setSearchPrecioMax(e.target.value)}
+            style={{ marginTop: '8px' }}
+          />
+
+          <div className="panel-divider" style={{ margin: '12px 0' }}></div>
+
+          <div className="filter-row" style={{ paddingTop: 0 }}>
+            <span className="switch-text">Solo disponibles</span>
+            <label className="modern-switch">
+              <input type="checkbox" checked={searchDisponible} onChange={e => setSearchDisponible(e.target.checked)} />
+              <span className="slider round"></span>
+            </label>
+          </div>
+          <div className="filter-row">
+            <span className="switch-text text-blue-400">Solo PMR</span>
+            <label className="modern-switch">
+              <input type="checkbox" checked={searchPmr} onChange={e => setSearchPmr(e.target.checked)} />
+              <span className="slider round blue"></span>
+            </label>
+          </div>
+
+          <button className="btn-reserve-strict" style={{ marginTop: '14px' }} onClick={handleBusquedaAvanzada}>
+            <i className="fa-solid fa-magnifying-glass"></i> Buscar
+          </button>
+        </div>
+      )}
+
       {/* ── ÁREA DEL MAPA ── */}
-      <div className="map-area">
-        <Map 
-          location={state.userLoc} 
-          isLoading={state.loading} 
-          error={state.reserveError} 
-          parkings={state.parkings} 
+      <div className="map-area" style={{ position: 'relative' }}>
+        <Map
+          location={state.userLoc}
+          isLoading={state.loading}
+          error={state.reserveError}
+          parkings={state.parkings}
           onSpotSelect={actions.setSelectedSpot}
           radius={localRadius}
           filters={filters}
           userProfile={state.userProfile}
         />
+        {state.loading && (
+          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 500, textAlign: 'center', pointerEvents: 'none' }}>
+            <i className="fa-solid fa-circle-notch fa-spin" style={{ fontSize: '2rem', color: '#3b82f6', filter: 'drop-shadow(0 0 8px #3b82f6)' }}></i>
+          </div>
+        )}
+        {!state.loading && state.parkings.length === 0 && (
+          <div style={{ position: 'absolute', bottom: '24px', left: '50%', transform: 'translateX(-50%)', zIndex: 500, background: 'rgba(15,23,42,0.9)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '12px 20px', color: '#94a3b8', fontSize: '0.85rem', whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+            <i className="fa-solid fa-radar mr-2" style={{ color: '#3b82f6' }}></i>
+            Sin estacionamientos en este radio — expande el radar
+          </div>
+        )}
       </div>
 
-      {/* ── PANEL DE RESERVA ── */}
-      {state.selectedSpot && (
+      {/* ── PANEL DE INFORMACIÓN ── */}
+      {state.selectedSpot && !selectorOpen && (
         <div className={`glass-panel-strict reservation-panel ${state.selectedSpot ? 'slide-in' : ''}`}>
           <div className="res-header">
-            <h3><i className="fa-solid fa-square-parking text-blue-500 mr-2"></i> {state.selectedSpot.nombre}</h3>
-            <button className="btn-close-strict" onClick={() => actions.setSelectedSpot(null)}>
-              <i className="fa-solid fa-xmark"></i>
-            </button>
+            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <i className="fa-solid fa-square-parking" style={{ color: '#3b82f6' }}></i>
+              {state.selectedSpot.nombre}
+            </h3>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button
+                className="btn-close-strict"
+                onClick={() => toggleFavorito(state.selectedSpot)}
+                disabled={favLoading}
+                title={favIds.has(state.selectedSpot.id) ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+                aria-label={favIds.has(state.selectedSpot.id) ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+                style={{ color: favIds.has(state.selectedSpot.id) ? '#f59e0b' : '#64748b', fontSize: '1.1rem' }}
+              >
+                <i className={`fa-${favIds.has(state.selectedSpot.id) ? 'solid' : 'regular'} fa-star`}></i>
+              </button>
+              <button className="btn-close-strict" aria-label="Cerrar panel" onClick={() => actions.setSelectedSpot(null)}>
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            </div>
           </div>
-          
+
           <div className="res-body">
-            <p className="res-row"><i className="fa-solid fa-user-tie"></i> <span>{state.selectedSpot.arrendador || 'Red P2P'}</span></p>
             <p className="res-row">
-              <i className="fa-solid fa-car"></i> 
-              <span className="text-green-500 font-bold">
-                {(state.selectedSpot.total_spots || 10) - (state.selectedSpot.occupied_spots || 0)} disp.
+              <i className="fa-solid fa-user-tie" style={{ color: '#64748b', width: '16px' }}></i>
+              <span style={{ color: '#cbd5e1' }}>{state.selectedSpot.arrendador || 'Red P2P'}</span>
+            </p>
+            <p className="res-row">
+              <i className="fa-solid fa-car" style={{ color: '#64748b', width: '16px' }}></i>
+              <span style={{ color: '#10b981', fontWeight: 700 }}>
+                {(state.selectedSpot.total_spots || 10) - (state.selectedSpot.occupied_spots || 0)} disponibles
               </span>
+              <span style={{ color: '#475569', fontSize: '0.8rem' }}>/ {state.selectedSpot.total_spots || 10} totales</span>
             </p>
             {state.selectedSpot.precio_hora !== undefined && (
-              <p className="res-row"><i className="fa-solid fa-coins"></i> <span className="text-yellow-500 font-bold">
-                {state.selectedSpot.precio_hora === 0 ? 'Gratuito' : `$${state.selectedSpot.precio_hora?.toLocaleString()}/hr`}
-              </span></p>
+              <p className="res-row">
+                <i className="fa-solid fa-coins" style={{ color: '#64748b', width: '16px' }}></i>
+                <span style={{ color: '#f59e0b', fontWeight: 700 }}>
+                  {state.selectedSpot.precio_hora === 0 ? 'Gratuito' : `$${state.selectedSpot.precio_hora?.toLocaleString()}/hr`}
+                </span>
+              </p>
+            )}
+            {state.selectedSpot.comuna && (
+              <p className="res-row">
+                <i className="fa-solid fa-location-dot" style={{ color: '#64748b', width: '16px' }}></i>
+                <span style={{ color: '#94a3b8' }}>{state.selectedSpot.comuna}</span>
+              </p>
             )}
             {state.selectedSpot.es_pmr && (
-              <div className="pmr-badge-strict mt-3">
+              <div className="pmr-badge-strict" style={{ marginTop: '8px' }}>
                 <i className="fa-solid fa-wheelchair"></i> Accesibilidad PMR Habilitada
               </div>
             )}
 
-            <div className="mt-5 pt-4 border-t border-white/10">
-              {state.reserveStep === 0 && (
-                <button className="btn-reserve-strict" onClick={actions.handleReserve}>
-                  SOLICITAR ESPACIO
-                </button>
-              )}
-              {state.reserveStep > 0 && state.reserveStep < 3 && (
-                <div className="text-center text-sm text-slate-300 py-3 animate-pulse">
-                  <i className="fa-solid fa-circle-notch fa-spin text-blue-500 mr-2"></i> Procesando transacción...
-                </div>
-              )}
-              {state.reserveStep === 3 && (
-                <div className="text-center text-sm text-green-500 font-bold py-3 bg-green-500/10 rounded-lg border border-green-500/20">
-                  <i className="fa-solid fa-circle-check mr-2"></i> ¡Match Exitoso!
-                </div>
-              )}
+            <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
               {state.reserveError && (
-                <div className="text-center text-sm text-red-400 py-3 bg-red-500/10 rounded-lg mt-2 border border-red-500/20">
+                <div style={{ color: '#f87171', fontSize: '0.82rem', padding: '8px 12px', background: 'rgba(239,68,68,0.08)', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.2)', marginBottom: '10px', textAlign: 'center' }}>
                   {state.reserveError}
                 </div>
               )}
+              <button
+                className="btn-reserve-strict"
+                onClick={() => setSelectorOpen(true)}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', fontSize: '0.9rem', letterSpacing: '0.5px' }}
+              >
+                <i className="fa-solid fa-border-all"></i>
+                ELEGIR PLAZA
+              </button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── MODAL SELECTOR DE PLAZA ── */}
+      {selectorOpen && state.selectedSpot && (
+        <ParkingSelector
+          parking={state.selectedSpot}
+          isReserving={state.isReserving}
+          onReserve={actions.handleReserve}
+          onClose={() => {
+            setSelectorOpen(false);
+            actions.setSelectedSpot(null);
+          }}
+        />
       )}
 
       <style jsx>{`
@@ -408,9 +588,34 @@ export default function MapaPageContainer() {
         }
         .btn-reserve-strict:hover { background: #1d4ed8; }
 
+        /* Búsqueda avanzada */
+        .search-panel {
+          position: absolute;
+          top: 24px;
+          left: 360px;
+          z-index: 1000;
+          width: 280px;
+          padding: 18px;
+        }
+        .search-input {
+          width: 100%;
+          padding: 10px 14px;
+          background: rgba(0,0,0,0.3);
+          border: 1px solid rgba(255,255,255,0.1);
+          border-radius: 10px;
+          color: white;
+          font-size: 0.9rem;
+          outline: none;
+          box-sizing: border-box;
+          transition: border-color 0.2s;
+        }
+        .search-input:focus { border-color: rgba(59,130,246,0.5); }
+        .search-input::placeholder { color: #64748b; }
+
         @media (max-width: 600px) {
           .radar-overlay { width: calc(100% - 48px); }
           .btn-gps-strict { position: absolute; right: 0; top: 0; }
+          .search-panel { left: 24px; top: auto; bottom: 24px; width: calc(100% - 48px); }
         }
       `}</style>
     </div>

@@ -54,6 +54,7 @@ export default function Navbar() {
   const [user, setUser] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
   const pathname = usePathname();
   const router = useRouter();
   const dropdownRef = useRef(null);
@@ -84,6 +85,37 @@ export default function Navbar() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // ── Realtime pending reservations count ──
+  useEffect(() => {
+    if (!user) { setPendingCount(0); return; }
+
+    let channel;
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) return;
+      const token = session.access_token;
+
+      const loadCount = async () => {
+        try {
+          const res = await fetch('/api/reservas/manage?scope=arrendador', {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const data = await res.json();
+          if (data.success) {
+            setPendingCount((data.data || []).filter(r => r.estado === 'pendiente').length);
+          }
+        } catch { /* ignore */ }
+      };
+
+      loadCount();
+      channel = supabase
+        .channel('navbar-reservas')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'reservas' }, loadCount)
+        .subscribe();
+    });
+
+    return () => { if (channel) supabase.removeChannel(channel); };
+  }, [user]);
 
   // ── Click Outside Dropdown ──
   useEffect(() => {
@@ -185,6 +217,15 @@ export default function Navbar() {
                       <Link href="/profile" className="nav-link-cyber dropdown-item" onClick={closeMenus}>
                         <i className="fa-solid fa-user-gear dropdown-icon"></i>
                         <span>Mi Perfil</span>
+                      </Link>
+                      <Link href="/reservas" className="nav-link-cyber dropdown-item" onClick={closeMenus} style={{ position: 'relative' }}>
+                        <i className="fa-solid fa-calendar-check dropdown-icon"></i>
+                        <span>Mis Reservas</span>
+                        {pendingCount > 0 && (
+                          <span style={{ marginLeft: 'auto', background: '#ef4444', color: 'white', borderRadius: '10px', fontSize: '0.7rem', padding: '1px 7px', fontWeight: 900 }}>
+                            {pendingCount}
+                          </span>
+                        )}
                       </Link>
                       <Link href="/dashboard" className="nav-link-cyber dropdown-item" onClick={closeMenus}>
                         <i className="fa-solid fa-chart-line dropdown-icon"></i>

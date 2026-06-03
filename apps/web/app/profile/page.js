@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@parkings/supabase-db';
 import { toast, Toaster } from 'react-hot-toast';
+import { api } from '../../src/lib/api';
 
 export default function ProfilePage() {
   const [session, setSession] = useState(null);
@@ -15,8 +16,55 @@ export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState('personales'); // personales, vehiculos, pmr
   
   const [nuevoVehiculo, setNuevoVehiculo] = useState({ patente: '', marca: '', modelo: '', color: '' });
-  
+
+  const [reservas, setReservas] = useState([]);
+  const [loadingReservas, setLoadingReservas] = useState(false);
+  const [favoritos, setFavoritos] = useState([]);
+  const [loadingFavs, setLoadingFavs] = useState(false);
+
   const router = useRouter();
+
+  const cargarReservas = async () => {
+    setLoadingReservas(true);
+    const res = await api.reservas.listar('conductor');
+    if (res.success) setReservas(res.data || []);
+    setLoadingReservas(false);
+  };
+
+  useEffect(() => {
+    if (activeTab === 'reservas') cargarReservas();
+    if (activeTab === 'favoritos') {
+      setLoadingFavs(true);
+      api.favoritos.listar().then(res => {
+        if (res.success) setFavoritos(res.data || []);
+        setLoadingFavs(false);
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  const handleQuitarFavorito = async (estacionamientoId) => {
+    await api.favoritos.quitar(estacionamientoId);
+    setFavoritos(prev => prev.filter(f => (f.estacionamiento?.id ?? f.estacionamiento_id) !== estacionamientoId));
+    toast.success('Eliminado de favoritos');
+  };
+
+  const handleCancelarReserva = async (id) => {
+    const res = await api.reservas.cancelar(id);
+    if (res.success) { toast.success('Reserva cancelada'); cargarReservas(); }
+    else toast.error(res.error || 'No se pudo cancelar');
+  };
+
+  const handleCalificarReserva = async (id) => {
+    const valor = parseInt(window.prompt('Califica tu experiencia (1 a 5):'), 10);
+    if (!valor || valor < 1 || valor > 5) { toast.error('Calificación inválida'); return; }
+    const comentario = window.prompt('Comentario (opcional):') || null;
+    const res = await api.reservas.calificar(id, valor, comentario);
+    if (res.success) { toast.success('¡Gracias por tu calificación!'); cargarReservas(); }
+    else toast.error(res.error || 'No se pudo calificar');
+  };
+
+  const fmtFecha = (f) => f ? new Date(f).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -56,12 +104,12 @@ export default function ProfilePage() {
         if (vehiculosError) throw vehiculosError;
         if (vehiculosData) setVehiculos(vehiculosData);
       } catch (vehiculosErr) {
-        console.error('Error cargando vehículos (puede no existir la tabla):', vehiculosErr);
+        if (process.env.NODE_ENV === 'development') console.error('Error cargando vehículos (puede no existir la tabla):', vehiculosErr);
         setVehiculos([]);
       }
 
     } catch (error) {
-      console.error(error);
+      if (process.env.NODE_ENV === 'development') console.error(error);
       toast.error('Error al cargar datos del perfil');
     } finally {
       setLoading(false);
@@ -114,7 +162,7 @@ export default function ProfilePage() {
     try {
       const { error } = await supabase.from('vehiculos').delete().eq('id', id);
       if (error) throw error;
-      setVehiculos(vehiculos.filter(v => v.id !== id));
+      setVehiculos(prev => prev.filter(v => v.id !== id));
       toast.success('Vehículo removido');
     } catch (error) {
       toast.error('Error al remover vehículo');
@@ -123,7 +171,7 @@ export default function ProfilePage() {
 
   const handleTogglePMR = async () => {
     const newValue = !perfil.requiere_pmr;
-    setPerfil({ ...perfil, requiere_pmr: newValue });
+    setPerfil(prev => ({ ...prev, requiere_pmr: newValue }));
     try {
       const { error } = await supabase.from('perfiles').upsert({
         id: session.user.id,
@@ -132,7 +180,7 @@ export default function ProfilePage() {
       if (error) throw error;
       toast.success(newValue ? 'Filtro PMR Activado' : 'Filtro PMR Desactivado');
     } catch (error) {
-      setPerfil({ ...perfil, requiere_pmr: !newValue }); // rollback
+      setPerfil(prev => ({ ...prev, requiere_pmr: !newValue }));
       toast.error('Error al actualizar preferencias');
     }
   };
@@ -150,7 +198,7 @@ export default function ProfilePage() {
       const avatarUrl = `${publicUrl}?t=${Date.now()}`;
       const { error: updateError } = await supabase.from('perfiles').upsert({ id: session.user.id, avatar_url: avatarUrl });
       if (updateError) throw updateError;
-      setPerfil({ ...perfil, avatar_url: avatarUrl });
+      setPerfil(prev => ({ ...prev, avatar_url: avatarUrl }));
       toast.success('Avatar actualizado');
     } catch (error) {
       toast.error(error.message || 'Error al subir avatar');
@@ -219,9 +267,9 @@ export default function ProfilePage() {
           <div className="role-badge" style={{
             padding: '8px 16px',
             borderRadius: '12px',
-            border: `1px solid ${perfil.rol === 'anfitrion' ? 'rgba(245, 158, 11, 0.3)' : 'rgba(59, 130, 246, 0.3)'}`,
-            background: perfil.rol === 'anfitrion' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(59, 130, 246, 0.1)',
-            color: perfil.rol === 'anfitrion' ? '#f59e0b' : '#60a5fa',
+            border: `1px solid ${perfil.rol === 'arrendador' ? 'rgba(245, 158, 11, 0.3)' : 'rgba(59, 130, 246, 0.3)'}`,
+            background: perfil.rol === 'arrendador' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+            color: perfil.rol === 'arrendador' ? '#f59e0b' : '#60a5fa',
             fontSize: '0.8rem',
             fontWeight: '800',
             letterSpacing: '1px',
@@ -230,8 +278,8 @@ export default function ProfilePage() {
             alignItems: 'center',
             gap: '8px'
           }}>
-            <i className={`fa-solid ${perfil.rol === 'anfitrion' ? 'fa-building' : 'fa-car'}`}></i>
-            {perfil.rol === 'anfitrion' ? 'ANFITRIÓN' : 'CONDUCTOR'}
+            <i className={`fa-solid ${perfil.rol === 'arrendador' ? 'fa-building' : 'fa-car'}`}></i>
+            {perfil.rol === 'arrendador' ? 'ARRENDADOR' : 'CONDUCTOR'}
           </div>
 
           <div className="nav-tabs">
@@ -240,6 +288,12 @@ export default function ProfilePage() {
             </button>
             <button className={`tab-btn ${activeTab === 'vehiculos' ? 'active' : ''}`} onClick={() => setActiveTab('vehiculos')}>
               <i className="fa-solid fa-car"></i> Mis Vehículos ({vehiculos.length})
+            </button>
+            <button className={`tab-btn ${activeTab === 'reservas' ? 'active' : ''}`} onClick={() => setActiveTab('reservas')}>
+              <i className="fa-solid fa-calendar-check"></i> Mis Reservas
+            </button>
+            <button className={`tab-btn ${activeTab === 'favoritos' ? 'active' : ''}`} onClick={() => setActiveTab('favoritos')}>
+              <i className="fa-solid fa-star"></i> Favoritos
             </button>
             <button className={`tab-btn ${activeTab === 'pmr' ? 'active' : ''}`} onClick={() => setActiveTab('pmr')}>
               <i className="fa-solid fa-wheelchair"></i> Accesibilidad
@@ -268,10 +322,10 @@ export default function ProfilePage() {
                   </div>
                 </div>
                 <div className="info-card">
-                  <div className="info-card-icon role"><i className={`fa-solid ${perfil.rol === 'anfitrion' ? 'fa-building' : 'fa-car'}`}></i></div>
+                  <div className="info-card-icon role"><i className={`fa-solid ${perfil.rol === 'arrendador' ? 'fa-building' : 'fa-car'}`}></i></div>
                   <div className="info-card-data">
                     <span className="info-label">TIPO DE CUENTA</span>
-                    <span className="info-value">{perfil.rol === 'anfitrion' ? 'Anfitrión' : 'Conductor'}</span>
+                    <span className="info-value">{perfil.rol === 'arrendador' ? 'Arrendador' : 'Conductor'}</span>
                   </div>
                 </div>
                 <div className="info-card">
@@ -315,7 +369,7 @@ export default function ProfilePage() {
           {activeTab === 'vehiculos' && (
             <div className="tab-pane fade-in">
               <h2>Flota Registrada</h2>
-              <p className="subtitle-desc">El anfitrión necesita estos datos para autorizar tu ingreso.</p>
+              <p className="subtitle-desc">El arrendador necesita estos datos para autorizar tu ingreso.</p>
               
               <div className="vehicles-list">
                 {vehiculos.length === 0 ? (
@@ -354,6 +408,99 @@ export default function ProfilePage() {
                   {saving ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-plus"></i>} Agregar
                 </button>
               </form>
+            </div>
+          )}
+
+          {activeTab === 'reservas' && (
+            <div className="tab-pane fade-in">
+              <h2>Mis Reservas</h2>
+              <p className="subtitle-desc">Historial y reservas activas. Califica las completadas y gestiona las próximas.</p>
+
+              {loadingReservas ? (
+                <div className="empty-state"><i className="fa-solid fa-spinner fa-spin"></i> Cargando reservas…</div>
+              ) : reservas.length === 0 ? (
+                <div className="empty-state">Aún no tienes reservas. Encuentra un estacionamiento en el mapa.</div>
+              ) : (
+                <div className="vehicles-list">
+                  {reservas.map(r => (
+                    <div key={r.id} className="vehicle-card reserva-card">
+                      <div className="v-details" style={{ marginLeft: 0 }}>
+                        <strong>{r.estacionamiento?.nombre || 'Estacionamiento'}</strong>
+                        <span>{r.estacionamiento?.comuna ? `${r.estacionamiento.comuna} · ` : ''}{fmtFecha(r.fecha_inicio)} → {fmtFecha(r.fecha_fin)}</span>
+                        <span>
+                          {r.precio_total != null && <>💲 ${Number(r.precio_total).toLocaleString('es-CL')} · </>}
+                          <span className={`estado-badge estado-${r.estado}`}>{r.estado}</span>
+                          {r.calificacion ? <> · {'★'.repeat(r.calificacion)}</> : null}
+                        </span>
+                      </div>
+                      <div className="reserva-actions">
+                        {(r.estado === 'pendiente' || r.estado === 'confirmada') && (
+                          <button onClick={() => handleCancelarReserva(r.id)} className="btn-icon-danger" title="Cancelar">
+                            <i className="fa-solid fa-ban"></i>
+                          </button>
+                        )}
+                        {r.estado === 'completada' && !r.calificacion && (
+                          <button onClick={() => handleCalificarReserva(r.id)} className="btn-cyber-secondary" style={{ padding: '8px 14px' }}>
+                            <i className="fa-solid fa-star"></i> Calificar
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'favoritos' && (
+            <div className="tab-pane fade-in">
+              <h2>Estacionamientos Favoritos</h2>
+              <p className="subtitle-desc">Tus lugares guardados. Accede rápidamente desde aquí o desde el mapa.</p>
+
+              {loadingFavs ? (
+                <div className="empty-state"><i className="fa-solid fa-spinner fa-spin"></i> Cargando favoritos…</div>
+              ) : favoritos.length === 0 ? (
+                <div className="empty-state">
+                  <i className="fa-solid fa-star" style={{ fontSize: '2rem', color: '#334155', marginBottom: '12px' }}></i>
+                  <p>Aún no tienes favoritos. Toca la estrella en cualquier estacionamiento del mapa.</p>
+                </div>
+              ) : (
+                <div className="vehicles-list">
+                  {favoritos.map(f => {
+                    const est = f.estacionamiento || {};
+                    const id = est.id ?? f.estacionamiento_id;
+                    return (
+                      <div key={f.id} className="vehicle-card" style={{ justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                          <div className="v-icon" style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b' }}>
+                            <i className="fa-solid fa-star"></i>
+                          </div>
+                          <div className="v-details" style={{ marginLeft: 0 }}>
+                            <strong>{est.nombre || 'Estacionamiento'}</strong>
+                            <span>
+                              {est.comuna ? `${est.comuna} · ` : ''}
+                              {est.precio_hora != null ? (est.precio_hora === 0 ? 'Gratuito' : `$${Number(est.precio_hora).toLocaleString('es-CL')}/hr`) : ''}
+                              {est.es_pmr ? ' · ♿ PMR' : ''}
+                            </span>
+                            {est.rating > 0 && (
+                              <span style={{ color: '#f59e0b', fontSize: '0.8rem' }}>
+                                {'★'.repeat(Math.round(est.rating))}{'☆'.repeat(5 - Math.round(est.rating))} {est.rating}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleQuitarFavorito(id)}
+                          className="btn-icon-danger"
+                          title="Quitar de favoritos"
+                        >
+                          <i className="fa-solid fa-star-slash"></i>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
@@ -471,6 +618,16 @@ export default function ProfilePage() {
         .toggle-switch label:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
         .toggle-switch input:checked + label { background-color: #10b981; box-shadow: 0 0 15px rgba(16, 185, 129, 0.5); }
         .toggle-switch input:checked + label:before { transform: translateX(26px); }
+
+        /* Reservas */
+        .reserva-card { gap: 15px; }
+        .reserva-actions { display: flex; align-items: center; gap: 10px; }
+        .estado-badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; }
+        .estado-pendiente { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+        .estado-confirmada { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+        .estado-activa { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+        .estado-completada { background: rgba(148, 163, 184, 0.15); color: #94a3b8; }
+        .estado-cancelada { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
 
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }

@@ -2,6 +2,9 @@
 import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import 'leaflet.markercluster/dist/MarkerCluster.css';
+import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
+import 'leaflet.markercluster';
 
 export default function Map({ 
   location, 
@@ -45,8 +48,31 @@ export default function Map({
         maxZoom: 20
       }).addTo(mapRef.current);
 
-      // Crear capas globales en window para mantener persistencia entre re-renders
-      window.__markerLayer = L.layerGroup().addTo(mapRef.current);
+      window.__markerLayer = L.markerClusterGroup({
+        maxClusterRadius: 60,
+        spiderfyOnMaxZoom: true,
+        showCoverageOnHover: false,
+        iconCreateFunction: (cluster) => {
+          const count = cluster.getChildCount();
+          let size = 'small';
+          if (count > 10) size = 'medium';
+          if (count > 30) size = 'large';
+          return L.divIcon({
+            html: `<div style="
+              background: rgba(59, 130, 246, 0.85);
+              width: ${size === 'large' ? 44 : size === 'medium' ? 38 : 32}px;
+              height: ${size === 'large' ? 44 : size === 'medium' ? 38 : 32}px;
+              border-radius: 50%;
+              border: 2px solid rgba(255,255,255,0.8);
+              box-shadow: 0 0 20px rgba(59,130,246,0.5);
+              display: flex; align-items: center; justify-content: center;
+              color: white; font-size: 12px; font-weight: 800;
+            ">${count}</div>`,
+            className: 'marker-cluster-custom',
+            iconSize: L.point(size === 'large' ? 44 : size === 'medium' ? 38 : 32, size === 'large' ? 44 : size === 'medium' ? 38 : 32),
+          });
+        }
+      }).addTo(mapRef.current);
       
       // Geovalla Base
       window.__radarCircle = L.circle([location.lat, location.lng], {
@@ -129,9 +155,10 @@ export default function Map({
       const marker = L.marker([spot.lat, spot.lng], { icon }).addTo(markerLayer);
 
       const precio = spot.precio_hora ? `$${spot.precio_hora.toLocaleString()}/hr` : 'Gratis';
+      const safeName = (spot.nombre || '').replace(/[<>&"']/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' })[c]);
       const tooltipContent = `
         <div style="font-family: 'Inter', sans-serif; padding: 4px;">
-          <strong style="font-size: 14px; color: #f8fafc;">${spot.nombre}</strong><br>
+          <strong style="font-size: 14px; color: #f8fafc;">${safeName}</strong><br>
           <span style="color: #94a3b8; font-size: 11px;">${precio}</span><br>
           <span style="color: ${stateColor}; font-weight: 800; font-size: 12px; display: block; margin-top: 4px;">
             ${isAvailable ? `${spotsLeft} disp.` : 'COMPLETO'}
@@ -151,7 +178,11 @@ export default function Map({
       });
     });
 
-    return () => {}; // Evitamos limpieza total en unmount
+    return () => {
+      if (window.__markerLayer) { window.__markerLayer.clearLayers(); }
+      if (window.__radarCircle) { window.__radarCircle.remove(); window.__radarCircle = null; }
+      if (window.__radarPulse) { window.__radarPulse.remove(); window.__radarPulse = null; }
+    };
   }, [location, isLoading, parkings, onSpotSelect, radius, filters]);
 
   // 3. Reactividad estricta del Live Avatar Marker

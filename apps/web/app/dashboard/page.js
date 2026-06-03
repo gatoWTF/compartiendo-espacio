@@ -31,6 +31,7 @@ export default function DashboardPage() {
   const [esPmr, setEsPmr] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [toast, setToast] = useState(null);
+  const [reservasRecibidas, setReservasRecibidas] = useState([]);
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
@@ -59,7 +60,7 @@ export default function DashboardPage() {
         const { data: profileData } = await supabase.from('perfiles').select('rol, nombre').eq('id', authSession.user.id).single();
         profile = profileData;
       } catch (e) {
-        console.warn('[Dashboard] Perfil no disponible, usando fallback de auth metadata');
+        if (process.env.NODE_ENV === 'development') console.warn('[Dashboard] Perfil no disponible, usando fallback de auth metadata');
       }
       
       const userObj = {
@@ -78,10 +79,34 @@ export default function DashboardPage() {
         console.error('Error cargando estacionamientos:', e);
       }
 
+      if (userObj.rol === 'arrendador') {
+        try {
+          const rr = await api.reservas.listar('arrendador');
+          if (rr.success) setReservasRecibidas(rr.data || []);
+        } catch (e) {
+          if (process.env.NODE_ENV === 'development') console.error('Error cargando reservas recibidas:', e);
+        }
+      }
+
       setLoading(false);
     };
     checkUserAndFetchData();
   }, [router]);
+
+  const recargarReservasRecibidas = async () => {
+    const rr = await api.reservas.listar('arrendador');
+    if (rr.success) setReservasRecibidas(rr.data || []);
+  };
+
+  const gestionarReserva = async (accion, id) => {
+    const fn = { confirmar: api.reservas.confirmar, completar: api.reservas.completar, cancelar: api.reservas.cancelar }[accion];
+    showToast('Procesando reserva...', 'syncing');
+    const res = await fn(id);
+    if (res.success) { showToast('Reserva actualizada', 'success'); recargarReservasRecibidas(); }
+    else showToast(res.error || 'No se pudo actualizar la reserva', 'error');
+  };
+
+  const fmtFechaR = (f) => f ? new Date(f).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
 
   const handleSearchAddress = async () => {
     if (!direccion.trim()) return;
@@ -119,7 +144,7 @@ export default function DashboardPage() {
       });
 
       if (result.success && result.data) {
-        setMyParkings([result.data, ...myParkings]);
+        setMyParkings(prev => [result.data, ...prev]);
         setNombre(''); setDireccion(''); setLat(''); setLng(''); setTotalSpots(1); setEsPmr(false);
         showToast('¡Espacio creado y guardado en Supabase DB!', 'success');
       }
@@ -133,7 +158,7 @@ export default function DashboardPage() {
     if (newOccupied < 0 || newOccupied > total) return;
     
     // Optimistic Update
-    setMyParkings(myParkings.map(p => p.id === id ? { ...p, occupied_spots: newOccupied } : p));
+    setMyParkings(prev => prev.map(p => p.id === id ? { ...p, occupied_spots: newOccupied } : p));
     showToast('Sincronizando cupos...', 'syncing');
 
     try {
@@ -144,16 +169,15 @@ export default function DashboardPage() {
         throw new Error(res.error);
       }
     } catch (error) {
-      // Revertir si falla
-      setMyParkings(myParkings.map(p => p.id === id ? { ...p, occupied_spots: currentOccupied } : p));
+      setMyParkings(prev => prev.map(p => p.id === id ? { ...p, occupied_spots: currentOccupied } : p));
       showToast('Error al actualizar en DB', 'error');
     }
   };
 
   const toggleSelection = (id) =>
-    selectedIds.includes(id)
-      ? setSelectedIds(selectedIds.filter(i => i !== id))
-      : setSelectedIds([...selectedIds, id]);
+    setSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
 
   const selectAll = () =>
     selectedIds.length === myParkings.length
@@ -174,7 +198,7 @@ export default function DashboardPage() {
     try {
       const result = await api.mapas.eliminarEstacionamientos(selectedIds);
       if (result.success) {
-        setMyParkings(myParkings.filter(p => !selectedIds.includes(p.id)));
+        setMyParkings(prev => prev.filter(p => !selectedIds.includes(p.id)));
         setSelectedIds([]);
         showToast(`${selectedIds.length} estacionamiento(s) eliminado(s) de Supabase.`, 'success');
       }
@@ -235,7 +259,7 @@ export default function DashboardPage() {
 
       <div className="dashboard-grid">
         {/* KPI METRICS */}
-        {session?.user?.rol === 'anfitrion' && myParkings.length > 0 && (
+        {session?.user?.rol === 'arrendador' && myParkings.length > 0 && (
           <div className="kpi-row">
             <div className="kpi-card">
               <div className="kpi-icon blue"><i className="fa-solid fa-warehouse"></i></div>
@@ -272,8 +296,8 @@ export default function DashboardPage() {
           </div>
         )}
         
-        {/* FORMULARIO NUEVO ESPACIO (Sólo Anfitriones) */}
-        {session?.user?.rol === 'anfitrion' && (
+        {/* FORMULARIO NUEVO ESPACIO (Sólo Arrendadores) */}
+        {session?.user?.rol === 'arrendador' && (
           <div className="glass-panel form-panel">
             <h3><i className="fa-solid fa-square-parking"></i> Publicar Estacionamiento</h3>
             <p className="panel-desc">Añade tu plaza a la red y comienza a generar ingresos con tu espacio disponible.</p>
@@ -324,23 +348,67 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {/* RESERVAS RECIBIDAS (Sólo Arrendadores) */}
+        {session?.user?.rol === 'arrendador' && (
+          <div className="glass-panel form-panel">
+            <h3><i className="fa-solid fa-calendar-check"></i> Reservas Recibidas ({reservasRecibidas.length})</h3>
+            <p className="panel-desc">Confirma, completa o cancela las reservas de tus estacionamientos.</p>
+
+            {reservasRecibidas.length === 0 ? (
+              <div className="glass-panel empty-state" style={{ marginTop: '10px' }}>
+                <i className="fa-solid fa-inbox"></i>
+                <p>Todavía no has recibido reservas.</p>
+              </div>
+            ) : (
+              <div className="reservas-recibidas">
+                {reservasRecibidas.map(r => (
+                  <div key={r.id} className="reserva-row">
+                    <div className="reserva-info">
+                      <strong>{r.estacionamiento?.nombre || 'Estacionamiento'}</strong>
+                      <span>{fmtFechaR(r.fecha_inicio)} → {fmtFechaR(r.fecha_fin)}</span>
+                      <span className={`estado-badge estado-${r.estado}`}>{r.estado}</span>
+                    </div>
+                    <div className="reserva-acts">
+                      {r.estado === 'pendiente' && (
+                        <button onClick={() => gestionarReserva('confirmar', r.id)} className="btn-cyber-secondary action-btn">
+                          <i className="fa-solid fa-check"></i> Confirmar
+                        </button>
+                      )}
+                      {(r.estado === 'confirmada' || r.estado === 'activa') && (
+                        <button onClick={() => gestionarReserva('completar', r.id)} className="btn-cyber-secondary action-btn">
+                          <i className="fa-solid fa-flag-checkered"></i> Completar
+                        </button>
+                      )}
+                      {(r.estado === 'pendiente' || r.estado === 'confirmada') && (
+                        <button onClick={() => gestionarReserva('cancelar', r.id)} className="btn-delete-bulk">
+                          <i className="fa-solid fa-ban"></i>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* INVENTARIO / MIS VEHICULOS */}
         <div className="inventory-panel">
           <div className="inventory-header">
             <h3>
-              {session?.user?.rol === 'anfitrion' ? (
+              {session?.user?.rol === 'arrendador' ? (
                 <><i className="fa-solid fa-warehouse"></i> Mis Estacionamientos ({myParkings.length})</>
               ) : (
                 <><i className="fa-solid fa-car"></i> Mis Vehículos ({myParkings.length})</>
               )}
             </h3>
-            {myParkings.length > 0 && session?.user?.rol === 'anfitrion' && (
+            {myParkings.length > 0 && session?.user?.rol === 'arrendador' && (
               <div className="inventory-actions">
-                <button onClick={selectAll} className="btn-cyber-secondary action-btn">
+                <button onClick={selectAll} className="btn-cyber-secondary action-btn" aria-label={selectedIds.length === myParkings.length ? 'Desmarcar todos' : 'Seleccionar todos'}>
                   {selectedIds.length === myParkings.length ? 'Desmarcar' : 'Seleccionar'}
                 </button>
                 {selectedIds.length > 0 && (
-                  <button onClick={handleBulkDelete} className="btn-delete-bulk">
+                  <button onClick={handleBulkDelete} className="btn-delete-bulk" aria-label={`Borrar ${selectedIds.length} estacionamiento(s) seleccionado(s)`}>
                     <i className="fa-solid fa-trash"></i> Borrar ({selectedIds.length})
                   </button>
                 )}
@@ -350,7 +418,7 @@ export default function DashboardPage() {
 
           {myParkings.length === 0 ? (
             <div className="glass-panel empty-state">
-              {session?.user?.rol === 'anfitrion' ? (
+              {session?.user?.rol === 'arrendador' ? (
                 <>
                   <i className="fa-solid fa-square-parking"></i>
                   <p>Aún no tienes plazas publicadas. Añade tu primer estacionamiento para comenzar a recibir reservas.</p>
@@ -405,6 +473,21 @@ export default function DashboardPage() {
 
       <style jsx>{`
         .dashboard-container { padding: 30px; position: relative; max-width: 1400px; margin: 0 auto; }
+
+        /* Reservas recibidas */
+        .reservas-recibidas { display: flex; flex-direction: column; gap: 12px; }
+        .reserva-row { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 16px 18px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; flex-wrap: wrap; }
+        .reserva-row:hover { border-color: rgba(59, 130, 246, 0.3); }
+        .reserva-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+        .reserva-info strong { color: white; font-size: 1.05rem; }
+        .reserva-info span { color: #94a3b8; font-size: 0.85rem; }
+        .reserva-acts { display: flex; align-items: center; gap: 10px; }
+        .estado-badge { display: inline-block; width: fit-content; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; }
+        .estado-pendiente { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+        .estado-confirmada { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+        .estado-activa { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+        .estado-completada { background: rgba(148, 163, 184, 0.15); color: #94a3b8; }
+        .estado-cancelada { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
         
         .dashboard-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 30px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 20px; flex-wrap: wrap; gap: 20px; }
         .header-titles h2 { font-size: 2.2rem; color: #3b82f6; margin: 0; font-weight: 900; letter-spacing: -1px; }
@@ -474,7 +557,7 @@ export default function DashboardPage() {
         .empty-state i { font-size: 3rem; margin-bottom: 20px; opacity: 0.5; }
         .empty-state p { font-weight: 700; }
         
-        .parking-list { display: flex; flexDirection: column; gap: 15px; }
+        .parking-list { display: flex; flex-direction: column; gap: 15px; }
         .parking-item { display: flex; justify-content: space-between; align-items: center; padding: 20px; transition: 0.3s; }
         .parking-item.selected { border-color: #ef4444; background: rgba(239, 68, 68, 0.05); }
         .parking-item:hover { transform: translateX(5px); }

@@ -4,8 +4,17 @@ import Navbar from '../src/components/Navbar';
 export const metadata = {
   title: "Parkings Together | Encuentra y Comparte Estacionamientos",
   description: "Encuentra estacionamientos cerca de ti y comienza a generar ingresos compartiendo tu plaza disponible.",
-  icons: {
-    icon: '/favicon.ico',
+  icons: { icon: '/favicon.ico' },
+  openGraph: {
+    title: "Parkings Together",
+    description: "Encuentra y comparte estacionamientos P2P cerca de ti.",
+    type: 'website',
+    locale: 'es_CL',
+  },
+  twitter: {
+    card: 'summary',
+    title: "Parkings Together",
+    description: "Encuentra y comparte estacionamientos P2P cerca de ti.",
   },
 };
 

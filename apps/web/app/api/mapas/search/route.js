@@ -44,8 +44,46 @@ export async function GET(request) {
     const lng = parseFloat(searchParams.get('lng'));
     const radius = parseFloat(searchParams.get('radius'));
 
+    const q = searchParams.get('q') || null;
+    const comuna = searchParams.get('comuna') || null;
+    const pmr = searchParams.get('pmr');
+    const disponible = searchParams.get('disponible');
+    const precioMax = parseFloat(searchParams.get('precioMax'));
+
+    const hasGeo = !Number.isNaN(lat) && !Number.isNaN(lng) && !Number.isNaN(radius) && radius > 0 && radius < 9999;
+
+    if (hasGeo && !userId) {
+      // Use PostGIS spatial RPC — O(log n) via GIST index
+      const { data, error } = await supabase.rpc('buscar_estacionamientos_radio', {
+        p_lat: lat,
+        p_lng: lng,
+        p_radio_km: radius,
+        p_q: q,
+        p_comuna: comuna,
+        p_pmr: pmr === 'true' ? true : null,
+        p_precio_max: !Number.isNaN(precioMax) ? Math.round(precioMax) : null,
+        p_disponible: disponible === 'true' ? true : null,
+      });
+
+      if (error) {
+        return NextResponse.json({ success: false, error: error.message, data: [] }, { status: 500 });
+      }
+      return NextResponse.json({ success: true, data: data || [] }, {
+        status: 200,
+        headers: { 'Cache-Control': 'public, max-age=20, stale-while-revalidate=60' },
+      });
+    }
+
+    // Fallback: non-spatial query (userId filter, or no geo params = fetch all)
     let query = supabase.from('estacionamientos').select('*');
     if (userId) query = query.eq('user_id', userId);
+    if (q) {
+      const escaped = q.replace(/%/g, '\\%').replace(/_/g, '\\_');
+      query = query.ilike('nombre', `%${escaped}%`);
+    }
+    if (comuna) query = query.ilike('comuna', comuna);
+    if (pmr === 'true') query = query.eq('es_pmr', true);
+    if (!Number.isNaN(precioMax)) query = query.lte('precio_hora', precioMax);
 
     const { data, error } = await query;
     if (error) {
@@ -54,8 +92,14 @@ export async function GET(request) {
 
     let result = data || [];
 
-    // Filtro geográfico opcional (solo si se entregan lat/lng/radius válidos y radius < 9999).
-    if (!Number.isNaN(lat) && !Number.isNaN(lng) && !Number.isNaN(radius) && radius > 0 && radius < 9999) {
+    if (disponible === 'true') {
+      result = result.filter(
+        (p) => p.total_spots == null || Number(p.occupied_spots ?? 0) < Number(p.total_spots)
+      );
+    }
+
+    // In-memory geo filter only for fallback path (e.g. userId + geo)
+    if (hasGeo) {
       result = result.filter(
         (p) => distanciaKm(lat, lng, Number(p.lat), Number(p.lng)) <= radius
       );
@@ -75,26 +119,37 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    if (!body.nombre || body.lat === undefined || body.lng === undefined || !body.userId) {
+    if (!body.nombre || body.lat === undefined || body.lng === undefined) {
       return NextResponse.json(
-        { success: false, error: 'Faltan campos obligatorios: nombre, lat, lng, userId.' },
+        { success: false, error: 'Faltan campos obligatorios: nombre, lat, lng.' },
         { status: 400 }
       );
     }
 
+    const latVal = parseFloat(body.lat);
+    const lngVal = parseFloat(body.lng);
+    if (!Number.isFinite(latVal) || !Number.isFinite(lngVal)) {
+      return NextResponse.json({ success: false, error: 'lat/lng inválidos.' }, { status: 400 });
+    }
+
+    const db = getSupabaseWithToken(token);
+    const { data: { user } } = await db.auth.getUser();
+    if (!user) return NextResponse.json({ success: false, error: 'Sesión inválida.' }, { status: 401 });
+
     const parkingData = {
       nombre: body.nombre,
       arrendador: body.arrendador,
-      lat: parseFloat(body.lat),
-      lng: parseFloat(body.lng),
+      lat: latVal,
+      lng: lngVal,
+      coordenadas: `SRID=4326;POINT(${lngVal} ${latVal})`,
       total_spots: parseInt(body.totalSpots) || 1,
       occupied_spots: 0,
       es_pmr: body.esPmr || false,
-      user_id: body.userId,
-      precio_hora: 1500, // Regla de negocio: precio base en CLP
+      user_id: user.id,
+      precio_hora: parseInt(body.precioHora) || 1500,
+      comuna: body.comuna || null,
     };
 
-    const db = getSupabaseWithToken(token);
     const { data, error } = await db
       .from('estacionamientos')
       .insert([parkingData])
@@ -118,14 +173,15 @@ export async function PATCH(request) {
     }
 
     const body = await request.json();
-    if (!body.id || body.occupied_spots === undefined) {
-      return NextResponse.json({ success: false, error: 'Se requiere id y occupied_spots.' }, { status: 400 });
+    const spots = parseInt(body.occupied_spots);
+    if (!body.id || !Number.isFinite(spots) || spots < 0) {
+      return NextResponse.json({ success: false, error: 'Se requiere id y occupied_spots (>= 0).' }, { status: 400 });
     }
 
     const db = getSupabaseWithToken(token);
     const { data, error } = await db
       .from('estacionamientos')
-      .update({ occupied_spots: body.occupied_spots })
+      .update({ occupied_spots: spots })
       .eq('id', body.id)
       .select()
       .single();

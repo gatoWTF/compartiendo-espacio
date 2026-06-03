@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '../lib/api';
 import { useRouter } from 'next/navigation';
 import { useGeolocation } from './useGeolocation';
 import { supabase } from '@parkings/supabase-db';
 
 export function useMapRadar() {
-  const { location: userLoc, isLoading: isLocating, error: locError, userProfile } = useGeolocation();
+  const { location: userLoc, locationSource, isLoading: isLocating, error: locError, userProfile } = useGeolocation();
   const [parkings, setParkings] = useState([]);
   const [radius, setRadius] = useState(5);
   const [sortOption, setSortOption] = useState('cercania');
@@ -35,16 +35,22 @@ export function useMapRadar() {
     } catch (e) { return []; }
   };
 
-  const loadParkings = async () => {
+  const debounceRef = useRef(null);
+
+  const loadParkings = useCallback(async (r, lat, lng) => {
     setLoading(true);
-    const effectiveRadius = parseInt(radius) === 100 ? 9999 : radius;
-    const data = await fetchRadar(effectiveRadius, userLoc.lat, userLoc.lng);
+    const effectiveRadius = parseInt(r) === 100 ? 9999 : r;
+    const data = await fetchRadar(effectiveRadius, lat, lng);
     setParkings(data);
     setLoading(false);
-  };
+  }, []);
 
   useEffect(() => {
-    loadParkings();
+    // Debounce location/radius changes by 400ms to prevent API flooding
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      loadParkings(radius, userLoc.lat, userLoc.lng);
+    }, 400);
 
     // ─── WEBSOCKETS REALTIME SUBSCRIPTION ───
     const channel = supabase
@@ -57,8 +63,7 @@ export function useMapRadar() {
             setParkings((current) =>
               current.map((p) => (p.id === payload.new.id ? { ...p, ...payload.new } : p))
             );
-            // Actualizar spot seleccionado si es el modificado
-            setSelectedSpot((current) => 
+            setSelectedSpot((current) =>
               current?.id === payload.new.id ? { ...current, ...payload.new } : current
             );
           } else if (payload.eventType === 'INSERT') {
@@ -72,10 +77,11 @@ export function useMapRadar() {
       .subscribe();
 
     return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [radius, userLoc]);
+  }, [radius, userLoc.lat, userLoc.lng]);
 
   const handleReserve = async () => {
     // Use Supabase session instead of localStorage
@@ -95,8 +101,7 @@ export function useMapRadar() {
         throw new Error('El nodo ya no está disponible o está lleno.');
       }
 
-      setReserveStep(2); 
-      await new Promise(resolve => setTimeout(resolve, 2000)); 
+      setReserveStep(2);
 
       const resData = await api.reservas.crearReserva({
         parking_id: selectedSpot.id,
@@ -127,7 +132,7 @@ export function useMapRadar() {
   };
 
   return {
-    state: { userLoc, parkings, radius, sortOption, selectedSpot, loading, isCloud, mobileMenuOpen, isReserving, reserveStep, reserveError, userProfile },
-    actions: { setRadius, setSortOption, setSelectedSpot, setMobileMenuOpen, handleReserve }
+    state: { userLoc, locationSource, parkings, radius, sortOption, selectedSpot, loading, isCloud, mobileMenuOpen, isReserving, reserveStep, reserveError, userProfile },
+    actions: { setRadius, setSortOption, setSelectedSpot, setMobileMenuOpen, handleReserve, setParkingsOverride: setParkings }
   };
 }

@@ -1,6 +1,6 @@
 'use client';
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -18,20 +18,27 @@ const registerSchema = z.object({
   password: z.string().regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]).{8,}$/, {
     message: "Contraseña insegura: Mínimo 8 caracteres, incluye mayúscula, minúscula, número y símbolo."
   }),
-  rol: z.enum(['cliente', 'anfitrion'], { required_error: "Debes seleccionar un rol" })
+  rol: z.enum(['cliente', 'arrendador'], { required_error: "Debes seleccionar un rol" })
 });
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [successAnim, setSuccessAnim] = useState(false);
+  const [pendingConfirm, setPendingConfirm] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const errorMsg = searchParams.get('error');
+    if (errorMsg) toast.error(decodeURIComponent(errorMsg));
+  }, [searchParams]);
 
   const currentSchema = isLogin ? loginSchema : registerSchema;
 
   const { register, handleSubmit, formState: { errors }, reset, setValue, watch } = useForm({
     resolver: zodResolver(currentSchema),
-    mode: 'onSubmit',
+    mode: 'onBlur',
     defaultValues: { rol: 'cliente' }
   });
 
@@ -71,42 +78,41 @@ export default function AuthPage() {
         }, 1500);
 
       } else {
-        const { error, data: authData } = await supabase.auth.signUp({
-          email: data.email,
-          password: data.password,
-          options: {
-            data: { nombre: data.nombre, rol: data.rol }
-          }
+        // Signup via server-side route (evita rate limit de email y unexpected_failure)
+        const res = await fetch('/api/auth/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: data.email, password: data.password, nombre: data.nombre, rol: data.rol }),
         });
-        
-        if (error) throw error;
-        
-        // Registrar el perfil
-        if (authData?.user) {
-           const { error: profileError } = await supabase.from('perfiles').insert({
-             id: authData.user.id,
-             nombre: data.nombre,
-             rol: data.rol
-           });
-           
-           if (profileError) {
-             console.error("Error al crear perfil:", profileError);
-             toast.error("Cuenta creada, pero hubo un error al inicializar el perfil.");
-           }
+        const result = await res.json();
+
+        if (!res.ok) throw new Error(result.error || 'Error al crear cuenta.');
+
+        if (result.autoLogin && result.session) {
+          // Restaurar sesión en el cliente con el token devuelto por el servidor
+          await supabase.auth.setSession({
+            access_token: result.session.access_token,
+            refresh_token: result.session.refresh_token,
+          });
         }
 
         setSuccessAnim(true);
         toast.success("¡Cuenta creada exitosamente!");
-        
-        setTimeout(() => {
-          router.push('/mapa');
-        }, 1500);
+        setTimeout(() => router.push('/mapa'), 1500);
       }
     } catch (err) {
       console.error(err);
-      toast.error(err.message || "Ocurrió un error en la autenticación");
+      let msg = err.message || "Ocurrió un error en la autenticación";
+      if (err.status === 500 || msg.includes('unexpected_failure')) {
+        msg = "Error interno del servidor. Verifica que el correo no esté ya registrado o intenta más tarde.";
+      } else if (msg.includes('User already registered')) {
+        msg = "Este correo ya tiene una cuenta. Prueba a iniciar sesión.";
+      } else if (msg.includes('Email rate limit')) {
+        msg = "Demasiados intentos. Espera unos minutos antes de intentarlo de nuevo.";
+      }
+      toast.error(msg);
     } finally {
-      if (!successAnim) {
+      if (!successAnim && !pendingConfirm) {
         setLoading(false);
       }
     }
@@ -137,9 +143,9 @@ export default function AuthPage() {
                       <input type="radio" value="cliente" {...register("rol")} />
                       <i className="fa-solid fa-car"></i> Conductor
                     </label>
-                    <label className={`role-option ${selectedRol === 'anfitrion' ? 'active' : ''}`}>
-                      <input type="radio" value="anfitrion" {...register("rol")} />
-                      <i className="fa-solid fa-square-parking"></i> Anfitrión
+                    <label className={`role-option ${selectedRol === 'arrendador' ? 'active' : ''}`}>
+                      <input type="radio" value="arrendador" {...register("rol")} />
+                      <i className="fa-solid fa-square-parking"></i> Arrendador
                     </label>
                   </div>
                   {errors.rol && <p className="error-msg">{errors.rol.message}</p>}
@@ -182,6 +188,17 @@ export default function AuthPage() {
               </span>
             </div>
           </>
+        ) : pendingConfirm ? (
+          <div className="success-screen">
+            <div className="success-circle" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+              <i className="fa-solid fa-envelope"></i>
+            </div>
+            <h3>Confirma tu correo</h3>
+            <p style={{ color: '#f59e0b' }}>Te enviamos un enlace de verificación.<br/>Revisa tu bandeja de entrada.</p>
+            <button onClick={() => { setPendingConfirm(false); setIsLogin(true); }} className="auth-btn-main" style={{ marginTop: '20px', background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+              Ir a Iniciar Sesión
+            </button>
+          </div>
         ) : (
           <div className="success-screen">
             <div className="success-circle">
