@@ -77,6 +77,7 @@ export async function GET(request) {
     // Fallback: non-spatial query (userId filter, or no geo params = fetch all)
     let query = supabase.from('estacionamientos').select('*');
     if (userId) query = query.eq('user_id', userId);
+    else        query = query.eq('activo', true); // hide inactive spots from public search
     if (q) {
       const escaped = q.replace(/%/g, '\\%').replace(/_/g, '\\_');
       query = query.ilike('nombre', `%${escaped}%`);
@@ -178,12 +179,62 @@ export async function PATCH(request) {
     }
 
     const body = await request.json();
-    const spots = parseInt(body.occupied_spots);
-    if (!body.id || !Number.isFinite(spots) || spots < 0) {
-      return NextResponse.json({ success: false, error: 'Se requiere id y occupied_spots (>= 0).' }, { status: 400 });
+    if (!body.id) {
+      return NextResponse.json({ success: false, error: 'Se requiere id.' }, { status: 400 });
     }
 
     const db = getSupabaseWithToken(token);
+
+    // ── toggleActivo: flip the activo boolean ──
+    if (body.action === 'toggleActivo') {
+      const { data: current, error: fetchErr } = await db
+        .from('estacionamientos')
+        .select('activo')
+        .eq('id', body.id)
+        .single();
+
+      if (fetchErr) return NextResponse.json({ success: false, error: fetchErr.message }, { status: 404 });
+
+      const newActivo = !(current.activo ?? true);
+      const { data, error } = await db
+        .from('estacionamientos')
+        .update({ activo: newActivo })
+        .eq('id', body.id)
+        .select()
+        .single();
+
+      if (error) return NextResponse.json({ success: false, error: error.message }, { status: 403 });
+      return NextResponse.json({ success: true, data, activo: newActivo }, { status: 200 });
+    }
+
+    // ── updateFull: update all editable fields ──
+    if (body.action === 'updateFull') {
+      const updates = {};
+      if (body.nombre      !== undefined) updates.nombre       = body.nombre;
+      if (body.totalSpots  !== undefined) updates.total_spots  = parseInt(body.totalSpots);
+      if (body.esPmr       !== undefined) updates.es_pmr       = body.esPmr;
+      if (body.precioHora  !== undefined) updates.precio_hora  = body.precioHora ? Math.round(parseFloat(body.precioHora)) : null;
+      if (body.pricePerMinute !== undefined) updates.price_per_minute = body.pricePerMinute ? parseFloat(body.pricePerMinute) : null;
+      if (body.pricePerDay !== undefined) updates.price_per_day = body.pricePerDay ? Math.round(parseFloat(body.pricePerDay)) : null;
+      if (Array.isArray(body.allowedVehicleTypes)) updates.allowed_vehicle_types = body.allowedVehicleTypes;
+
+      const { data, error } = await db
+        .from('estacionamientos')
+        .update(updates)
+        .eq('id', body.id)
+        .select()
+        .single();
+
+      if (error) return NextResponse.json({ success: false, error: error.message }, { status: 403 });
+      return NextResponse.json({ success: true, data }, { status: 200 });
+    }
+
+    // ── Default: update occupied_spots only ──
+    const spots = parseInt(body.occupied_spots);
+    if (!Number.isFinite(spots) || spots < 0) {
+      return NextResponse.json({ success: false, error: 'Se requiere occupied_spots (>= 0).' }, { status: 400 });
+    }
+
     const { data, error } = await db
       .from('estacionamientos')
       .update({ occupied_spots: spots })
@@ -213,12 +264,40 @@ export async function DELETE(request) {
     }
 
     const db = getSupabaseWithToken(token);
-    const { error } = await db.from('estacionamientos').delete().in('id', body.ids);
 
-    if (error) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 403 });
+    // For each ID: check if there are active reservations.
+    // If yes → soft-delete (activo = false). If no → hard delete.
+    const hardDelete = [];
+    const softDelete = [];
+
+    for (const id of body.ids) {
+      const { count } = await db
+        .from('reservas')
+        .select('id', { count: 'exact', head: true })
+        .eq('estacionamiento_id', id)
+        .in('estado', ['pendiente', 'confirmada', 'activa']);
+
+      if (count > 0) softDelete.push(id);
+      else           hardDelete.push(id);
     }
-    return NextResponse.json({ success: true, deleted: body.ids.length }, { status: 200 });
+
+    if (softDelete.length > 0) {
+      const { error } = await db
+        .from('estacionamientos')
+        .update({ activo: false })
+        .in('id', softDelete);
+      if (error) return NextResponse.json({ success: false, error: error.message }, { status: 403 });
+    }
+    if (hardDelete.length > 0) {
+      const { error } = await db.from('estacionamientos').delete().in('id', hardDelete);
+      if (error) return NextResponse.json({ success: false, error: error.message }, { status: 403 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      hardDeleted: hardDelete.length,
+      softDeleted: softDelete.length,
+    }, { status: 200 });
   } catch (err) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
