@@ -277,7 +277,7 @@ export async function DELETE(request) {
         .eq('estacionamiento_id', id)
         .in('estado', ['pendiente', 'confirmada', 'activa']);
 
-      if (count > 0) softDelete.push(id);
+      if ((count ?? 0) > 0) softDelete.push(id);
       else           hardDelete.push(id);
     }
 
