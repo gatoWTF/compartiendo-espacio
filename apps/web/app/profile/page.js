@@ -19,6 +19,8 @@ export default function ProfilePage() {
 
   const [reservas, setReservas] = useState([]);
   const [loadingReservas, setLoadingReservas] = useState(false);
+  const [favoritos, setFavoritos] = useState([]);
+  const [loadingFavs, setLoadingFavs] = useState(false);
 
   const router = useRouter();
 
@@ -31,8 +33,21 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (activeTab === 'reservas') cargarReservas();
+    if (activeTab === 'favoritos') {
+      setLoadingFavs(true);
+      api.favoritos.listar().then(res => {
+        if (res.success) setFavoritos(res.data || []);
+        setLoadingFavs(false);
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
+
+  const handleQuitarFavorito = async (estacionamientoId) => {
+    await api.favoritos.quitar(estacionamientoId);
+    setFavoritos(prev => prev.filter(f => (f.estacionamiento?.id ?? f.estacionamiento_id) !== estacionamientoId));
+    toast.success('Eliminado de favoritos');
+  };
 
   const handleCancelarReserva = async (id) => {
     const res = await api.reservas.cancelar(id);
@@ -277,6 +292,9 @@ export default function ProfilePage() {
             <button className={`tab-btn ${activeTab === 'reservas' ? 'active' : ''}`} onClick={() => setActiveTab('reservas')}>
               <i className="fa-solid fa-calendar-check"></i> Mis Reservas
             </button>
+            <button className={`tab-btn ${activeTab === 'favoritos' ? 'active' : ''}`} onClick={() => setActiveTab('favoritos')}>
+              <i className="fa-solid fa-star"></i> Favoritos
+            </button>
             <button className={`tab-btn ${activeTab === 'pmr' ? 'active' : ''}`} onClick={() => setActiveTab('pmr')}>
               <i className="fa-solid fa-wheelchair"></i> Accesibilidad
             </button>
@@ -429,6 +447,58 @@ export default function ProfilePage() {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'favoritos' && (
+            <div className="tab-pane fade-in">
+              <h2>Estacionamientos Favoritos</h2>
+              <p className="subtitle-desc">Tus lugares guardados. Accede rápidamente desde aquí o desde el mapa.</p>
+
+              {loadingFavs ? (
+                <div className="empty-state"><i className="fa-solid fa-spinner fa-spin"></i> Cargando favoritos…</div>
+              ) : favoritos.length === 0 ? (
+                <div className="empty-state">
+                  <i className="fa-solid fa-star" style={{ fontSize: '2rem', color: '#334155', marginBottom: '12px' }}></i>
+                  <p>Aún no tienes favoritos. Toca la estrella en cualquier estacionamiento del mapa.</p>
+                </div>
+              ) : (
+                <div className="vehicles-list">
+                  {favoritos.map(f => {
+                    const est = f.estacionamiento || {};
+                    const id = est.id ?? f.estacionamiento_id;
+                    return (
+                      <div key={f.id} className="vehicle-card" style={{ justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                          <div className="v-icon" style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b' }}>
+                            <i className="fa-solid fa-star"></i>
+                          </div>
+                          <div className="v-details" style={{ marginLeft: 0 }}>
+                            <strong>{est.nombre || 'Estacionamiento'}</strong>
+                            <span>
+                              {est.comuna ? `${est.comuna} · ` : ''}
+                              {est.precio_hora != null ? (est.precio_hora === 0 ? 'Gratuito' : `$${Number(est.precio_hora).toLocaleString('es-CL')}/hr`) : ''}
+                              {est.es_pmr ? ' · ♿ PMR' : ''}
+                            </span>
+                            {est.rating > 0 && (
+                              <span style={{ color: '#f59e0b', fontSize: '0.8rem' }}>
+                                {'★'.repeat(Math.round(est.rating))}{'☆'.repeat(5 - Math.round(est.rating))} {est.rating}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleQuitarFavorito(id)}
+                          className="btn-icon-danger"
+                          title="Quitar de favoritos"
+                        >
+                          <i className="fa-solid fa-star-slash"></i>
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
