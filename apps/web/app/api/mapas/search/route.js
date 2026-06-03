@@ -44,13 +44,34 @@ export async function GET(request) {
     const lng = parseFloat(searchParams.get('lng'));
     const radius = parseFloat(searchParams.get('radius'));
 
-    // Filtros de BÚSQUEDA AVANZADA (todos opcionales y combinables).
-    const q = searchParams.get('q');                    // texto libre sobre nombre
-    const comuna = searchParams.get('comuna');           // comuna (case-insensitive)
-    const pmr = searchParams.get('pmr');                 // 'true' → solo plazas PMR
-    const disponible = searchParams.get('disponible');   // 'true' → con cupo libre
+    const q = searchParams.get('q') || null;
+    const comuna = searchParams.get('comuna') || null;
+    const pmr = searchParams.get('pmr');
+    const disponible = searchParams.get('disponible');
     const precioMax = parseFloat(searchParams.get('precioMax'));
 
+    const hasGeo = !Number.isNaN(lat) && !Number.isNaN(lng) && !Number.isNaN(radius) && radius > 0 && radius < 9999;
+
+    if (hasGeo && !userId) {
+      // Use PostGIS spatial RPC — O(log n) via GIST index
+      const { data, error } = await supabase.rpc('buscar_estacionamientos_radio', {
+        p_lat: lat,
+        p_lng: lng,
+        p_radio_km: radius,
+        p_q: q,
+        p_comuna: comuna,
+        p_pmr: pmr === 'true' ? true : null,
+        p_precio_max: !Number.isNaN(precioMax) ? Math.round(precioMax) : null,
+        p_disponible: disponible === 'true' ? true : null,
+      });
+
+      if (error) {
+        return NextResponse.json({ success: false, error: error.message, data: [] }, { status: 500 });
+      }
+      return NextResponse.json({ success: true, data: data || [] }, { status: 200 });
+    }
+
+    // Fallback: non-spatial query (userId filter, or no geo params = fetch all)
     let query = supabase.from('estacionamientos').select('*');
     if (userId) query = query.eq('user_id', userId);
     if (q) {
@@ -68,15 +89,14 @@ export async function GET(request) {
 
     let result = data || [];
 
-    // Disponibilidad: requiere columnas total_spots/occupied_spots (migración 005).
     if (disponible === 'true') {
       result = result.filter(
         (p) => p.total_spots == null || Number(p.occupied_spots ?? 0) < Number(p.total_spots)
       );
     }
 
-    // Filtro geográfico opcional (solo si se entregan lat/lng/radius válidos y radius < 9999).
-    if (!Number.isNaN(lat) && !Number.isNaN(lng) && !Number.isNaN(radius) && radius > 0 && radius < 9999) {
+    // In-memory geo filter only for fallback path (e.g. userId + geo)
+    if (hasGeo) {
       result = result.filter(
         (p) => distanciaKm(lat, lng, Number(p.lat), Number(p.lng)) <= radius
       );
