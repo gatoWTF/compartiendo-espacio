@@ -1,6 +1,6 @@
 'use client';
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -25,7 +25,14 @@ export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [successAnim, setSuccessAnim] = useState(false);
+  const [pendingConfirm, setPendingConfirm] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const errorMsg = searchParams.get('error');
+    if (errorMsg) toast.error(decodeURIComponent(errorMsg));
+  }, [searchParams]);
 
   const currentSchema = isLogin ? loginSchema : registerSchema;
 
@@ -75,38 +82,47 @@ export default function AuthPage() {
           email: data.email,
           password: data.password,
           options: {
-            data: { nombre: data.nombre, rol: data.rol }
+            data: { nombre: data.nombre, rol: data.rol },
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
           }
         });
-        
+
         if (error) throw error;
-        
-        // Registrar el perfil
-        if (authData?.user) {
-           const { error: profileError } = await supabase.from('perfiles').insert({
-             id: authData.user.id,
-             nombre: data.nombre,
-             rol: data.rol
-           });
-           
-           if (profileError) {
-             console.error("Error al crear perfil:", profileError);
-             toast.error("Cuenta creada, pero hubo un error al inicializar el perfil.");
-           }
+
+        // User confirmed immediately (email confirmation disabled in Supabase)
+        const needsConfirm = !authData?.session && authData?.user && !authData.user.confirmed_at;
+
+        if (authData?.user && !needsConfirm) {
+          await supabase.from('perfiles').upsert({
+            id: authData.user.id,
+            nombre: data.nombre,
+            rol: data.rol
+          }, { onConflict: 'id' });
+        }
+
+        if (needsConfirm) {
+          setPendingConfirm(true);
+          setLoading(false);
+          return;
         }
 
         setSuccessAnim(true);
         toast.success("¡Cuenta creada exitosamente!");
-        
-        setTimeout(() => {
-          router.push('/mapa');
-        }, 1500);
+        setTimeout(() => router.push('/mapa'), 1500);
       }
     } catch (err) {
       console.error(err);
-      toast.error(err.message || "Ocurrió un error en la autenticación");
+      let msg = err.message || "Ocurrió un error en la autenticación";
+      if (err.status === 500 || msg.includes('unexpected_failure')) {
+        msg = "Error interno del servidor. Verifica que el correo no esté ya registrado o intenta más tarde.";
+      } else if (msg.includes('User already registered')) {
+        msg = "Este correo ya tiene una cuenta. Prueba a iniciar sesión.";
+      } else if (msg.includes('Email rate limit')) {
+        msg = "Demasiados intentos. Espera unos minutos antes de intentarlo de nuevo.";
+      }
+      toast.error(msg);
     } finally {
-      if (!successAnim) {
+      if (!successAnim && !pendingConfirm) {
         setLoading(false);
       }
     }
@@ -182,6 +198,17 @@ export default function AuthPage() {
               </span>
             </div>
           </>
+        ) : pendingConfirm ? (
+          <div className="success-screen">
+            <div className="success-circle" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+              <i className="fa-solid fa-envelope"></i>
+            </div>
+            <h3>Confirma tu correo</h3>
+            <p style={{ color: '#f59e0b' }}>Te enviamos un enlace de verificación.<br/>Revisa tu bandeja de entrada.</p>
+            <button onClick={() => { setPendingConfirm(false); setIsLogin(true); }} className="auth-btn-main" style={{ marginTop: '20px', background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+              Ir a Iniciar Sesión
+            </button>
+          </div>
         ) : (
           <div className="success-screen">
             <div className="success-circle">
