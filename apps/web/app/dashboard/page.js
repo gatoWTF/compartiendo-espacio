@@ -20,7 +20,6 @@ export default function DashboardPage() {
   const [session, setSession] = useState(null);
   const [myParkings, setMyParkings] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [isCloud, setIsCloud] = useState(false);
   const router = useRouter();
 
   const [nombre, setNombre] = useState('');
@@ -39,11 +38,6 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
-    // Detectar si está en Vercel
-    if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) {
-      setIsCloud(true);
-    }
-
     const checkUserAndFetchData = async () => {
       // Use Supabase session instead of manually checking localStorage
       const { data: { session: authSession } } = await supabase.auth.getSession();
@@ -129,7 +123,7 @@ export default function DashboardPage() {
     if (!lat || !lng) { showToast('Fija el pin rojo en el mapa primero.', 'error'); return; }
 
     const nombreArrendador = session.user.nombre || session.user.email.split('@')[0];
-    showToast('Sincronizando con Supabase Cloud...', 'syncing');
+    showToast('Publicando estacionamiento...', 'syncing');
 
     try {
       const result = await api.mapas.crearEstacionamiento({
@@ -145,7 +139,7 @@ export default function DashboardPage() {
       if (result.success && result.data) {
         setMyParkings(prev => [result.data, ...prev]);
         setNombre(''); setDireccion(''); setLat(''); setLng(''); setTotalSpots(1); setEsPmr(false);
-        showToast('¡Espacio creado y guardado en Supabase DB!', 'success');
+        showToast('¡Estacionamiento publicado con éxito!', 'success');
       }
     } catch (err) {
       showToast(err.message || 'Error al guardar en Supabase.', 'error');
@@ -158,18 +152,18 @@ export default function DashboardPage() {
     
     // Optimistic Update
     setMyParkings(prev => prev.map(p => p.id === id ? { ...p, occupied_spots: newOccupied } : p));
-    showToast('Sincronizando cupos...', 'syncing');
+    showToast('Actualizando cupos...', 'syncing');
 
     try {
       const res = await api.mapas.actualizarOcupacion(id, newOccupied);
       if (res.success) {
-        showToast('Cupos actualizados en la Nube', 'success');
+        showToast('Cupos actualizados', 'success');
       } else {
         throw new Error(res.error);
       }
     } catch (error) {
       setMyParkings(prev => prev.map(p => p.id === id ? { ...p, occupied_spots: currentOccupied } : p));
-      showToast('Error al actualizar en DB', 'error');
+      showToast('Error al actualizar los cupos', 'error');
     }
   };
 
@@ -192,14 +186,14 @@ export default function DashboardPage() {
 
   const executeBulkDelete = async () => {
     setShowConfirmModal(false);
-    showToast('Borrando de Supabase Cloud...', 'syncing');
+    showToast('Eliminando...', 'syncing');
 
     try {
       const result = await api.mapas.eliminarEstacionamientos(selectedIds);
       if (result.success) {
         setMyParkings(prev => prev.filter(p => !selectedIds.includes(p.id)));
         setSelectedIds([]);
-        showToast(`${selectedIds.length} estacionamiento(s) eliminado(s) de Supabase.`, 'success');
+        showToast(`${selectedIds.length} estacionamiento(s) eliminado(s).`, 'success');
       }
     } catch (err) {
       showToast(err.message || 'Error al eliminar.', 'error');
@@ -209,7 +203,7 @@ export default function DashboardPage() {
   if (loading) return (
     <div style={{ height: '80vh', display: 'flex', flexDirection: 'column', gap: '20px', justifyContent: 'center', alignItems: 'center', color: 'white' }}>
       <i className="fa-solid fa-circle-notch fa-spin" style={{ fontSize: '3rem', color: 'var(--primary)' }}></i>
-      <h3 style={{ color: '#94a3b8' }}>Conectando a Microservicios...</h3>
+      <h3 style={{ color: '#94a3b8' }}>Cargando...</h3>
     </div>
   );
 
@@ -221,16 +215,6 @@ export default function DashboardPage() {
           <p>Hola, {session?.user?.nombre || session?.user?.email}</p>
         </div>
         
-        <div className="infra-badges">
-          <div className="infra-badge db">
-            <span className="dot pulse-green"></span> Supabase DB: Conectado
-          </div>
-          {isCloud && (
-            <div className="infra-badge cloud">
-              <i className="fa-solid fa-cloud"></i> Vercel Edge: Activo
-            </div>
-          )}
-        </div>
       </div>
 
       {/* TOAST SYSTEM */}
@@ -492,12 +476,6 @@ export default function DashboardPage() {
         .header-titles h2 { font-size: 2.2rem; color: #3b82f6; margin: 0; font-weight: 900; letter-spacing: -1px; }
         .header-titles p { color: #94a3b8; margin: 5px 0 0 0; font-size: 0.95rem; font-weight: 600; }
         
-        .infra-badges { display: flex; gap: 10px; flex-wrap: wrap; }
-        .infra-badge { padding: 6px 12px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; font-size: 0.75rem; color: #94a3b8; display: flex; align-items: center; gap: 8px; font-weight: 800; }
-        .infra-badge.db { border-color: rgba(16, 185, 129, 0.3); color: #10b981; }
-        .infra-badge.cloud { border-color: rgba(59, 130, 246, 0.3); color: #3b82f6; }
-        .dot { width: 8px; height: 8px; border-radius: 50%; }
-        .pulse-green { background: #10b981; box-shadow: 0 0 10px #10b981; animation: pulse 2s infinite; }
         
         .toast-notification { position: fixed; top: 20px; right: 20px; padding: 15px 25px; border-radius: 12px; font-weight: 800; display: flex; align-items: center; gap: 10px; z-index: 9999; animation: slideLeft 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         .toast-notification.success { background: #10b981; color: white; border: 2px solid #059669; }

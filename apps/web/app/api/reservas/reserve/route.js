@@ -74,8 +74,10 @@ export async function POST(request) {
     let reserva, error;
     // estacionamientos.id es integer en producción — coercionar explícitamente
     const estId = Number(parking_id);
-    // Compute fecha_inicio / fecha_fin from duration_hours when not explicitly provided
-    const resolvedInicio = fecha_inicio ?? new Date().toISOString();
+    // Compute fecha_inicio / fecha_fin from duration_hours when not explicitly provided.
+    // Add 30s buffer when no explicit start is given — prevents the Postgres past-check
+    // from triggering due to clock skew / network latency between client and server.
+    const resolvedInicio = fecha_inicio ?? new Date(Date.now() + 30_000).toISOString();
     const resolvedFin = fecha_fin ?? (duration_hours
       ? new Date(Date.now() + duration_hours * 3600 * 1000).toISOString()
       : null);
