@@ -97,6 +97,20 @@ export const api = {
         headers: await authHeaders(),
         body: JSON.stringify({ id, occupied_spots }),
       }),
+
+    actualizarEstacionamiento: async (id, data) =>
+      fetchWithTimeout(`${MAPAS_URL}/search`, {
+        method: 'PATCH',
+        headers: await authHeaders(),
+        body: JSON.stringify({ action: 'updateFull', id, ...data }),
+      }),
+
+    toggleActivar: async (id) =>
+      fetchWithTimeout(`${MAPAS_URL}/search`, {
+        method: 'PATCH',
+        headers: await authHeaders(),
+        body: JSON.stringify({ action: 'toggleActivo', id }),
+      }),
   },
   reservas: {
     verificarDisponibilidad: (parkingId) =>

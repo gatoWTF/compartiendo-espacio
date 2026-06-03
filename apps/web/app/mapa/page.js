@@ -10,7 +10,7 @@ const ParkingSelector = dynamic(() => import('../../src/components/ParkingSelect
 
 export default function MapaPageContainer() {
   const { state, actions } = useMapRadar();
-  const [filters, setFilters] = useState({ p2p: false, pmr: false });
+  const [filters, setFilters] = useState({ p2p: false, pmr: false, vehicle: null });
   const [localRadius, setLocalRadius] = useState(state.radius);
 
   // ── Búsqueda avanzada ──
@@ -168,14 +168,50 @@ export default function MapaPageContainer() {
             <div className="filter-row">
               <span className="switch-text text-blue-400">Mostrar PMR</span>
               <label className="modern-switch">
-                <input 
-                  type="checkbox" 
-                  checked={filters.pmr} 
-                  onChange={(e) => setFilters({...filters, pmr: e.target.checked})} 
+                <input
+                  type="checkbox"
+                  checked={filters.pmr}
+                  onChange={(e) => setFilters({...filters, pmr: e.target.checked})}
                 />
                 <span className="slider round blue"></span>
               </label>
             </div>
+          </div>
+
+          <div className="panel-divider"></div>
+
+          {/* Filtro de vehículo */}
+          <div className="control-group">
+            <div style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>Mi vehículo</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '6px' }}>
+              {[
+                { id: 'car',        icon: 'fa-car',           label: 'Auto' },
+                { id: 'motorcycle', icon: 'fa-motorcycle',    label: 'Moto' },
+                { id: 'bicycle',    icon: 'fa-bicycle',       label: 'Bici' },
+                { id: 'scooter',    icon: 'fa-person-biking', label: 'Scoot' },
+              ].map(v => {
+                const active = filters.vehicle === v.id;
+                return (
+                  <button
+                    key={v.id}
+                    title={v.label}
+                    onClick={() => setFilters(f => ({ ...f, vehicle: f.vehicle === v.id ? null : v.id }))}
+                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', padding: '8px 4px', borderRadius: '10px', border: active ? '1px solid rgba(59,130,246,0.6)' : '1px solid rgba(255,255,255,0.07)', background: active ? 'rgba(59,130,246,0.2)' : 'rgba(255,255,255,0.03)', color: active ? '#60a5fa' : '#64748b', cursor: 'pointer', transition: 'all 0.15s', fontSize: '0.6rem', fontWeight: 700 }}
+                  >
+                    <i className={`fa-solid ${v.icon}`} style={{ fontSize: '0.95rem' }}></i>
+                    {v.label}
+                  </button>
+                );
+              })}
+            </div>
+            {filters.vehicle && (
+              <button
+                onClick={() => setFilters(f => ({ ...f, vehicle: null }))}
+                style={{ marginTop: '8px', width: '100%', background: 'transparent', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', color: '#475569', fontSize: '0.72rem', padding: '5px', cursor: 'pointer' }}
+              >
+                <i className="fa-solid fa-xmark" style={{ marginRight: '4px' }}></i> Quitar filtro
+              </button>
+            )}
           </div>
         </div>
 

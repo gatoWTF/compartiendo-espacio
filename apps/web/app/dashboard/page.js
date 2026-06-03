@@ -20,7 +20,6 @@ export default function DashboardPage() {
   const [session, setSession] = useState(null);
   const [myParkings, setMyParkings] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [isCloud, setIsCloud] = useState(false);
   const router = useRouter();
 
   const [nombre, setNombre] = useState('');
@@ -29,6 +28,23 @@ export default function DashboardPage() {
   const [lng, setLng] = useState('');
   const [totalSpots, setTotalSpots] = useState(1);
   const [esPmr, setEsPmr] = useState(false);
+
+  // Pricing
+  const [precioHora,     setPrecioHora]     = useState('');
+  const [pricePerMinute, setPricePerMinute] = useState('');
+  const [pricePerDay,    setPricePerDay]    = useState('');
+
+  // Vehicle types
+  const VEHICLE_TYPES = [
+    { id: 'car',        label: 'Auto',      icon: 'fa-car'           },
+    { id: 'motorcycle', label: 'Moto',      icon: 'fa-motorcycle'    },
+    { id: 'bicycle',    label: 'Bicicleta', icon: 'fa-bicycle'       },
+    { id: 'scooter',    label: 'Scooter',   icon: 'fa-person-biking' },
+  ];
+  const [allowedVehicleTypes, setAllowedVehicleTypes] = useState(['car']);
+  const toggleVehicle = (id) => setAllowedVehicleTypes(prev =>
+    prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id]
+  );
   const [selectedIds, setSelectedIds] = useState([]);
   const [toast, setToast] = useState(null);
   const [reservasRecibidas, setReservasRecibidas] = useState([]);
@@ -39,12 +55,6 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
-    // Detectar si está en Vercel
-    const url = process.env.NEXT_PUBLIC_MS_MAPAS_URL || 'localhost';
-    if (url.includes('vercel.app') || window.location.hostname.includes('vercel.app')) {
-      setIsCloud(true);
-    }
-
     const checkUserAndFetchData = async () => {
       // Use Supabase session instead of manually checking localStorage
       const { data: { session: authSession } } = await supabase.auth.getSession();
@@ -130,7 +140,7 @@ export default function DashboardPage() {
     if (!lat || !lng) { showToast('Fija el pin rojo en el mapa primero.', 'error'); return; }
 
     const nombreArrendador = session.user.nombre || session.user.email.split('@')[0];
-    showToast('Sincronizando con Supabase Cloud...', 'syncing');
+    showToast('Publicando estacionamiento...', 'syncing');
 
     try {
       const result = await api.mapas.crearEstacionamiento({
@@ -141,12 +151,18 @@ export default function DashboardPage() {
         totalSpots: parseInt(totalSpots),
         esPmr,
         userId: session.user.id,
+        precioHora:         precioHora     ? parseFloat(precioHora)     : undefined,
+        pricePerMinute:     pricePerMinute ? parseFloat(pricePerMinute) : undefined,
+        pricePerDay:        pricePerDay    ? parseFloat(pricePerDay)    : undefined,
+        allowedVehicleTypes: allowedVehicleTypes.length > 0 ? allowedVehicleTypes : ['car'],
       });
 
       if (result.success && result.data) {
         setMyParkings(prev => [result.data, ...prev]);
         setNombre(''); setDireccion(''); setLat(''); setLng(''); setTotalSpots(1); setEsPmr(false);
-        showToast('¡Espacio creado y guardado en Supabase DB!', 'success');
+        setPrecioHora(''); setPricePerMinute(''); setPricePerDay('');
+        setAllowedVehicleTypes(['car']);
+        showToast('¡Estacionamiento publicado con éxito!', 'success');
       }
     } catch (err) {
       showToast(err.message || 'Error al guardar en Supabase.', 'error');
@@ -159,18 +175,18 @@ export default function DashboardPage() {
     
     // Optimistic Update
     setMyParkings(prev => prev.map(p => p.id === id ? { ...p, occupied_spots: newOccupied } : p));
-    showToast('Sincronizando cupos...', 'syncing');
+    showToast('Actualizando cupos...', 'syncing');
 
     try {
       const res = await api.mapas.actualizarOcupacion(id, newOccupied);
       if (res.success) {
-        showToast('Cupos actualizados en la Nube', 'success');
+        showToast('Cupos actualizados', 'success');
       } else {
         throw new Error(res.error);
       }
     } catch (error) {
       setMyParkings(prev => prev.map(p => p.id === id ? { ...p, occupied_spots: currentOccupied } : p));
-      showToast('Error al actualizar en DB', 'error');
+      showToast('Error al actualizar los cupos', 'error');
     }
   };
 
@@ -186,6 +202,74 @@ export default function DashboardPage() {
 
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
+  // ── Edit modal ──
+  const [editingParking,   setEditingParking]   = useState(null);
+  const [editNombre,       setEditNombre]       = useState('');
+  const [editTotalSpots,   setEditTotalSpots]   = useState(1);
+  const [editEsPmr,        setEditEsPmr]        = useState(false);
+  const [editPrecioHora,   setEditPrecioHora]   = useState('');
+  const [editPriceMin,     setEditPriceMin]     = useState('');
+  const [editPriceDay,     setEditPriceDay]     = useState('');
+  const [editVehicles,     setEditVehicles]     = useState(['car']);
+  const VEHICLE_EDIT = [
+    { id: 'car',        label: 'Auto',      icon: 'fa-car'           },
+    { id: 'motorcycle', label: 'Moto',      icon: 'fa-motorcycle'    },
+    { id: 'bicycle',    label: 'Bicicleta', icon: 'fa-bicycle'       },
+    { id: 'scooter',    label: 'Scooter',   icon: 'fa-person-biking' },
+  ];
+
+  const openEdit = (parking) => {
+    setEditingParking(parking);
+    setEditNombre(parking.nombre || '');
+    setEditTotalSpots(parking.total_spots || 1);
+    setEditEsPmr(parking.es_pmr || false);
+    setEditPrecioHora(parking.precio_hora != null ? String(parking.precio_hora) : '');
+    setEditPriceMin(parking.price_per_minute != null ? String(parking.price_per_minute) : '');
+    setEditPriceDay(parking.price_per_day != null ? String(parking.price_per_day) : '');
+    setEditVehicles(parking.allowed_vehicle_types?.length > 0 ? parking.allowed_vehicle_types : ['car']);
+  };
+
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    showToast('Guardando cambios...', 'syncing');
+    try {
+      const res = await api.mapas.actualizarEstacionamiento(editingParking.id, {
+        nombre:              editNombre,
+        totalSpots:          editTotalSpots,
+        esPmr:               editEsPmr,
+        precioHora:          editPrecioHora,
+        pricePerMinute:      editPriceMin,
+        pricePerDay:         editPriceDay,
+        allowedVehicleTypes: editVehicles.length > 0 ? editVehicles : ['car'],
+      });
+      if (res.success) {
+        setMyParkings(prev => prev.map(p => p.id === editingParking.id ? { ...p, ...res.data } : p));
+        setEditingParking(null);
+        showToast('Plaza actualizada con éxito', 'success');
+      } else {
+        showToast(res.error || 'No se pudo actualizar', 'error');
+      }
+    } catch (err) {
+      showToast(err.message || 'Error al guardar', 'error');
+    }
+  };
+
+  const handleToggleActivo = async (parking) => {
+    const wasActivo = parking.activo !== false;
+    showToast(wasActivo ? 'Desactivando plaza...' : 'Reactivando plaza...', 'syncing');
+    try {
+      const res = await api.mapas.toggleActivar(parking.id);
+      if (res.success) {
+        setMyParkings(prev => prev.map(p => p.id === parking.id ? { ...p, activo: res.activo } : p));
+        showToast(res.activo ? 'Plaza reactivada y visible en el mapa' : 'Plaza desactivada y oculta del mapa', 'success');
+      } else {
+        showToast(res.error || 'Error al cambiar estado', 'error');
+      }
+    } catch (err) {
+      showToast(err.message || 'Error', 'error');
+    }
+  };
+
   const handleBulkDelete = async () => {
     if (selectedIds.length === 0) return;
     setShowConfirmModal(true);
@@ -193,14 +277,21 @@ export default function DashboardPage() {
 
   const executeBulkDelete = async () => {
     setShowConfirmModal(false);
-    showToast('Borrando de Supabase Cloud...', 'syncing');
+    showToast('Eliminando...', 'syncing');
 
     try {
       const result = await api.mapas.eliminarEstacionamientos(selectedIds);
       if (result.success) {
-        setMyParkings(prev => prev.filter(p => !selectedIds.includes(p.id)));
+        // Hard-deleted → remove from list; soft-deleted → mark as inactive
+        setMyParkings(prev => prev
+          .filter(p => !selectedIds.includes(p.id) || result.softDeleted > 0)
+          .map(p => selectedIds.includes(p.id) ? { ...p, activo: false } : p)
+        );
         setSelectedIds([]);
-        showToast(`${selectedIds.length} estacionamiento(s) eliminado(s) de Supabase.`, 'success');
+        const msg = result.softDeleted > 0
+          ? `${result.hardDeleted} eliminado(s), ${result.softDeleted} desactivado(s) (tienen reservas activas)`
+          : `${result.hardDeleted} estacionamiento(s) eliminado(s)`;
+        showToast(msg, 'success');
       }
     } catch (err) {
       showToast(err.message || 'Error al eliminar.', 'error');
@@ -210,7 +301,7 @@ export default function DashboardPage() {
   if (loading) return (
     <div style={{ height: '80vh', display: 'flex', flexDirection: 'column', gap: '20px', justifyContent: 'center', alignItems: 'center', color: 'white' }}>
       <i className="fa-solid fa-circle-notch fa-spin" style={{ fontSize: '3rem', color: 'var(--primary)' }}></i>
-      <h3 style={{ color: '#94a3b8' }}>Conectando a Microservicios...</h3>
+      <h3 style={{ color: '#94a3b8' }}>Cargando...</h3>
     </div>
   );
 
@@ -222,16 +313,6 @@ export default function DashboardPage() {
           <p>Hola, {session?.user?.nombre || session?.user?.email}</p>
         </div>
         
-        <div className="infra-badges">
-          <div className="infra-badge db">
-            <span className="dot pulse-green"></span> Supabase DB: Conectado
-          </div>
-          {isCloud && (
-            <div className="infra-badge cloud">
-              <i className="fa-solid fa-cloud"></i> Vercel Edge: Activo
-            </div>
-          )}
-        </div>
       </div>
 
       {/* TOAST SYSTEM */}
@@ -241,6 +322,91 @@ export default function DashboardPage() {
           {toast.type === 'error' && <i className="fa-solid fa-triangle-exclamation"></i>}
           {toast.type === 'syncing' && <i className="fa-solid fa-arrows-rotate fa-spin"></i>}
           {toast.msg}
+        </div>
+      )}
+
+      {/* ── EDIT MODAL ── */}
+      {editingParking && (
+        <div className="modal-overlay">
+          <div className="glass-panel modal-content" style={{ maxWidth: '520px', width: '92%', textAlign: 'left', maxHeight: '85vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <i className="fa-solid fa-pen-to-square" style={{ color: '#3b82f6' }}></i> Editar Plaza
+              </h3>
+              <button onClick={() => setEditingParking(null)} style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1.2rem' }}>
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+            <form onSubmit={handleSaveEdit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* Nombre */}
+              <div className="input-group">
+                <i className="fa-solid fa-signature icon"></i>
+                <input type="text" placeholder="Nombre de la Plaza" value={editNombre} onChange={e => setEditNombre(e.target.value)} required />
+              </div>
+              {/* Cupos y PMR */}
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <div className="input-group" style={{ flex: 1 }}>
+                  <i className="fa-solid fa-car icon"></i>
+                  <input type="number" min="1" placeholder="Cupos totales" value={editTotalSpots} onChange={e => setEditTotalSpots(e.target.value)} required />
+                </div>
+              </div>
+              <div className="checkbox-pmr" style={{ cursor: 'pointer' }}>
+                <input type="checkbox" id="edit-pmr" checked={editEsPmr} onChange={e => setEditEsPmr(e.target.checked)} style={{ width: '20px', height: '20px', accentColor: '#38bdf8' }} />
+                <label htmlFor="edit-pmr" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'white', fontWeight: 700 }}>
+                  <i className="fa-solid fa-wheelchair" style={{ color: '#38bdf8' }}></i> Zona Prioritaria PMR
+                </label>
+              </div>
+              {/* Tarifas */}
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: '14px' }}>
+                <p style={{ color: '#94a3b8', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', fontWeight: 700 }}>
+                  <i className="fa-solid fa-coins" style={{ color: '#f59e0b', marginRight: '6px' }}></i> Tarifas
+                </p>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <div className="input-group" style={{ flex: 1 }}>
+                    <i className="fa-solid fa-clock icon"></i>
+                    <input type="number" min="0" placeholder="Por hora" value={editPrecioHora} onChange={e => setEditPrecioHora(e.target.value)} />
+                  </div>
+                  <div className="input-group" style={{ flex: 1 }}>
+                    <i className="fa-solid fa-stopwatch icon"></i>
+                    <input type="number" min="0" placeholder="Por minuto" value={editPriceMin} onChange={e => setEditPriceMin(e.target.value)} />
+                  </div>
+                  <div className="input-group" style={{ flex: 1 }}>
+                    <i className="fa-solid fa-calendar-day icon"></i>
+                    <input type="number" min="0" placeholder="Por día" value={editPriceDay} onChange={e => setEditPriceDay(e.target.value)} />
+                  </div>
+                </div>
+              </div>
+              {/* Vehículos */}
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: '14px' }}>
+                <p style={{ color: '#94a3b8', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', fontWeight: 700 }}>
+                  <i className="fa-solid fa-car" style={{ color: '#3b82f6', marginRight: '6px' }}></i> Vehículos admitidos
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '8px' }}>
+                  {VEHICLE_EDIT.map(v => {
+                    const active = editVehicles.includes(v.id);
+                    return (
+                      <button
+                        key={v.id}
+                        type="button"
+                        onClick={() => setEditVehicles(prev => prev.includes(v.id) ? prev.filter(x => x !== v.id) : [...prev, v.id])}
+                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', padding: '12px 6px', borderRadius: '12px', border: active ? '2px solid #3b82f6' : '1px solid rgba(255,255,255,0.08)', background: active ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.03)', color: active ? '#60a5fa' : '#64748b', cursor: 'pointer', transition: 'all 0.15s', fontWeight: 700, fontSize: '0.72rem' }}
+                      >
+                        <i className={`fa-solid ${v.icon}`} style={{ fontSize: '1.1rem' }}></i>
+                        {v.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              {/* Actions */}
+              <div style={{ display: 'flex', gap: '12px', paddingTop: '4px' }}>
+                <button type="button" onClick={() => setEditingParking(null)} className="btn-cancel" style={{ flex: 1 }}>Cancelar</button>
+                <button type="submit" className="btn-cyber-primary" style={{ flex: 2, padding: '12px' }}>
+                  <i className="fa-solid fa-floppy-disk"></i> Guardar Cambios
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
@@ -338,7 +504,59 @@ export default function DashboardPage() {
                 </div>
               </div>
               
-              {/* 3. Publicar nodo */}
+              {/* 3. Tarifas */}
+              <div className="form-block">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                  <i className="fa-solid fa-coins" style={{ color: '#f59e0b' }}></i>
+                  <span style={{ color: 'white', fontWeight: 700, fontSize: '1rem' }}>Configuración de Tarifas</span>
+                </div>
+                <div className="input-row" style={{ flexDirection: 'row' }}>
+                  <div className="input-group" style={{ flex: 1 }}>
+                    <i className="fa-solid fa-clock icon"></i>
+                    <input type="number" min="0" placeholder="Por hora (CLP)" value={precioHora} onChange={e => setPrecioHora(e.target.value)} />
+                  </div>
+                  <div className="input-group" style={{ flex: 1 }}>
+                    <i className="fa-solid fa-stopwatch icon"></i>
+                    <input type="number" min="0" placeholder="Por minuto (CLP)" value={pricePerMinute} onChange={e => setPricePerMinute(e.target.value)} />
+                  </div>
+                  <div className="input-group" style={{ flex: 1 }}>
+                    <i className="fa-solid fa-calendar-day icon"></i>
+                    <input type="number" min="0" placeholder="Por día (CLP)" value={pricePerDay} onChange={e => setPricePerDay(e.target.value)} />
+                  </div>
+                </div>
+                <p style={{ color: '#64748b', fontSize: '0.78rem', marginTop: '6px' }}>Define las tarifas disponibles. El sistema aplica automáticamente la combinación más conveniente para el usuario.</p>
+              </div>
+
+              {/* 4. Vehículos admitidos */}
+              <div className="form-block">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                  <i className="fa-solid fa-car" style={{ color: '#3b82f6' }}></i>
+                  <span style={{ color: 'white', fontWeight: 700, fontSize: '1rem' }}>Vehículos Admitidos</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '10px' }}>
+                  {[
+                    { id: 'car',        label: 'Auto',      icon: 'fa-car'           },
+                    { id: 'motorcycle', label: 'Moto',      icon: 'fa-motorcycle'    },
+                    { id: 'bicycle',    label: 'Bicicleta', icon: 'fa-bicycle'       },
+                    { id: 'scooter',    label: 'Scooter',   icon: 'fa-person-biking' },
+                  ].map(v => {
+                    const active = allowedVehicleTypes.includes(v.id);
+                    return (
+                      <button
+                        key={v.id}
+                        type="button"
+                        onClick={() => toggleVehicle(v.id)}
+                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: '14px 8px', borderRadius: '12px', border: active ? '2px solid #3b82f6' : '1px solid rgba(255,255,255,0.08)', background: active ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.03)', color: active ? '#60a5fa' : '#64748b', cursor: 'pointer', transition: 'all 0.15s', fontWeight: 700, fontSize: '0.75rem' }}
+                      >
+                        <i className={`fa-solid ${v.icon}`} style={{ fontSize: '1.3rem' }}></i>
+                        {v.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 5. Publicar */}
               <div className="form-block">
                 <button type="submit" className="btn-cyber-primary submit-btn" style={{width: '100%'}}>
                   <i className="fa-solid fa-cloud-arrow-up"></i> PUBLICAR ESTACIONAMIENTO
@@ -436,32 +654,62 @@ export default function DashboardPage() {
           ) : (
             <div className="parking-list">
               {myParkings.map((parking) => {
-                const isFull = parking.occupied_spots >= parking.total_spots;
+                const isFull     = parking.occupied_spots >= parking.total_spots;
                 const isSelected = selectedIds.includes(parking.id);
+                const isInactive = parking.activo === false;
                 return (
-                  <div key={parking.id} className={`glass-panel parking-item ${isSelected ? 'selected' : ''}`}>
+                  <div key={parking.id} className={`glass-panel parking-item ${isSelected ? 'selected' : ''} ${isInactive ? 'inactive-parking' : ''}`}>
                     <div className="item-info">
                       <input type="checkbox" checked={isSelected} onChange={() => toggleSelection(parking.id)} className="custom-checkbox" />
-                      <div>
+                      <div style={{ minWidth: 0 }}>
                         <h4>
                           {parking.nombre}
                           {parking.es_pmr && <i className="fa-solid fa-wheelchair pmr-icon"></i>}
                         </h4>
                         <div className="status-badges">
-                          <span className={`badge ${isFull ? 'red' : 'green'}`}>{isFull ? 'LLENO' : 'DISPONIBLE'}</span>
-                          <span className="spots-info"><i className="fa-solid fa-car-side"></i> {parking.occupied_spots}/{parking.total_spots} ocupados</span>
+                          {isInactive
+                            ? <span className="badge" style={{ background: 'rgba(100,116,139,0.2)', color: '#64748b' }}>INACTIVO</span>
+                            : <span className={`badge ${isFull ? 'red' : 'green'}`}>{isFull ? 'LLENO' : 'DISPONIBLE'}</span>
+                          }
+                          <span className="spots-info"><i className="fa-solid fa-car-side"></i> {parking.occupied_spots}/{parking.total_spots}</span>
+                          {parking.precio_hora > 0 && <span className="spots-info" style={{ color: '#f59e0b' }}>${parking.precio_hora?.toLocaleString()}/hr</span>}
                         </div>
                       </div>
                     </div>
-                    
-                    <div className="occupancy-controls">
-                      <button onClick={() => updateOccupancy(parking.id, parking.occupied_spots, parking.total_spots, -1)} disabled={parking.occupied_spots === 0} className="ctrl-btn minus">
-                        <i className="fa-solid fa-minus"></i>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                      {/* Edit button */}
+                      <button
+                        onClick={() => openEdit(parking)}
+                        title="Editar"
+                        aria-label="Editar estacionamiento"
+                        style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: '10px', color: '#60a5fa', cursor: 'pointer', padding: '8px 10px', fontSize: '0.9rem', transition: 'all 0.15s' }}
+                      >
+                        <i className="fa-solid fa-pen-to-square"></i>
                       </button>
-                      <strong>{parking.occupied_spots}</strong>
-                      <button onClick={() => updateOccupancy(parking.id, parking.occupied_spots, parking.total_spots, 1)} disabled={isFull} className="ctrl-btn plus">
-                        <i className="fa-solid fa-plus"></i>
+
+                      {/* Deactivate / Reactivate toggle */}
+                      <button
+                        onClick={() => handleToggleActivo(parking)}
+                        title={isInactive ? 'Reactivar' : 'Desactivar'}
+                        aria-label={isInactive ? 'Reactivar plaza' : 'Desactivar plaza'}
+                        style={{ background: isInactive ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)', border: `1px solid ${isInactive ? 'rgba(16,185,129,0.25)' : 'rgba(245,158,11,0.25)'}`, borderRadius: '10px', color: isInactive ? '#10b981' : '#f59e0b', cursor: 'pointer', padding: '8px 10px', fontSize: '0.9rem', transition: 'all 0.15s' }}
+                      >
+                        <i className={`fa-solid ${isInactive ? 'fa-eye' : 'fa-eye-slash'}`}></i>
                       </button>
+
+                      {/* Occupancy controls (only when active) */}
+                      {!isInactive && (
+                        <div className="occupancy-controls">
+                          <button onClick={() => updateOccupancy(parking.id, parking.occupied_spots, parking.total_spots, -1)} disabled={parking.occupied_spots === 0} className="ctrl-btn minus">
+                            <i className="fa-solid fa-minus"></i>
+                          </button>
+                          <strong>{parking.occupied_spots}</strong>
+                          <button onClick={() => updateOccupancy(parking.id, parking.occupied_spots, parking.total_spots, 1)} disabled={isFull} className="ctrl-btn plus">
+                            <i className="fa-solid fa-plus"></i>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -493,12 +741,6 @@ export default function DashboardPage() {
         .header-titles h2 { font-size: 2.2rem; color: #3b82f6; margin: 0; font-weight: 900; letter-spacing: -1px; }
         .header-titles p { color: #94a3b8; margin: 5px 0 0 0; font-size: 0.95rem; font-weight: 600; }
         
-        .infra-badges { display: flex; gap: 10px; flex-wrap: wrap; }
-        .infra-badge { padding: 6px 12px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; font-size: 0.75rem; color: #94a3b8; display: flex; align-items: center; gap: 8px; font-weight: 800; }
-        .infra-badge.db { border-color: rgba(16, 185, 129, 0.3); color: #10b981; }
-        .infra-badge.cloud { border-color: rgba(59, 130, 246, 0.3); color: #3b82f6; }
-        .dot { width: 8px; height: 8px; border-radius: 50%; }
-        .pulse-green { background: #10b981; box-shadow: 0 0 10px #10b981; animation: pulse 2s infinite; }
         
         .toast-notification { position: fixed; top: 20px; right: 20px; padding: 15px 25px; border-radius: 12px; font-weight: 800; display: flex; align-items: center; gap: 10px; z-index: 9999; animation: slideLeft 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         .toast-notification.success { background: #10b981; color: white; border: 2px solid #059669; }
@@ -560,6 +802,7 @@ export default function DashboardPage() {
         .parking-list { display: flex; flex-direction: column; gap: 15px; }
         .parking-item { display: flex; justify-content: space-between; align-items: center; padding: 20px; transition: 0.3s; }
         .parking-item.selected { border-color: #ef4444; background: rgba(239, 68, 68, 0.05); }
+        .parking-item.inactive-parking { opacity: 0.55; border-color: rgba(100,116,139,0.2); }
         .parking-item:hover { transform: translateX(5px); }
         
         .item-info { display: flex; align-items: center; gap: 20px; }
