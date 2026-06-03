@@ -1,26 +1,95 @@
 'use client';
 import { useState, useMemo, useEffect, useRef } from 'react';
 
-const DURATION_OPTIONS = [
-  { label: '30 min', hours: 0.5 },
-  { label: '1 hora', hours: 1 },
-  { label: '2 horas', hours: 2 },
-  { label: '4 horas', hours: 4 },
-  { label: 'Día completo', hours: 8 },
+const PAY_METHODS = [
+  { id: 'webpay',   label: 'Tarjeta (Webpay)',    icon: 'fa-credit-card'    },
+  { id: 'efectivo', label: 'Efectivo al llegar',  icon: 'fa-money-bill-wave' },
 ];
 
-const PAY_METHODS = [
-  { id: 'webpay', label: 'Tarjeta (Webpay)', icon: 'fa-credit-card' },
-  { id: 'efectivo', label: 'Efectivo al llegar', icon: 'fa-money-bill-wave' },
+const QUICK_DURATIONS = [
+  { label: '30 min', days: 0, hours: 0, mins: 30 },
+  { label: '1 hora',  days: 0, hours: 1, mins: 0  },
+  { label: '2 horas', days: 0, hours: 2, mins: 0  },
+  { label: '4 horas', days: 0, hours: 4, mins: 0  },
+  { label: '1 día',   days: 1, hours: 0, mins: 0  },
 ];
+
+// ── Tiered price calculation ──
+// Applies day rate first, then hour rate, then minute rate.
+// Falls back: minutes without minute rate are rounded up to next hour.
+function calcTotal(days, hours, mins, parking) {
+  const pMin  = parking.price_per_minute;
+  const pHour = parking.precio_hora;
+  const pDay  = parking.price_per_day;
+
+  let remaining = days * 1440 + hours * 60 + mins;
+  if (remaining <= 0) return 0;
+
+  let total = 0;
+
+  if (pDay && remaining >= 1440) {
+    const d = Math.floor(remaining / 1440);
+    total    += d * pDay;
+    remaining -= d * 1440;
+  }
+  if (pHour && remaining >= 60) {
+    const h = Math.floor(remaining / 60);
+    total    += h * pHour;
+    remaining -= h * 60;
+  }
+  if (remaining > 0) {
+    if (pMin)       total += remaining * pMin;
+    else if (pHour) total += pHour; // round up to next hour
+  }
+
+  return Math.round(total);
+}
+
+// ── Price breakdown lines for UI ──
+function calcBreakdown(days, hours, mins, parking) {
+  const pMin  = parking.price_per_minute;
+  const pHour = parking.precio_hora;
+  const pDay  = parking.price_per_day;
+  const lines = [];
+
+  let remaining = days * 1440 + hours * 60 + mins;
+  if (remaining <= 0) return lines;
+
+  if (pDay && remaining >= 1440) {
+    const d = Math.floor(remaining / 1440);
+    lines.push({ label: `${d} día${d > 1 ? 's' : ''}`, rate: `$${pDay.toLocaleString()}/día`, sub: d * pDay });
+    remaining -= d * 1440;
+  }
+  if (pHour && remaining >= 60) {
+    const h = Math.floor(remaining / 60);
+    lines.push({ label: `${h} hora${h > 1 ? 's' : ''}`, rate: `$${pHour.toLocaleString()}/hr`, sub: h * pHour });
+    remaining -= h * 60;
+  }
+  if (remaining > 0) {
+    if (pMin) {
+      lines.push({ label: `${remaining} min`, rate: `$${pMin.toLocaleString()}/min`, sub: remaining * pMin });
+    } else if (pHour) {
+      lines.push({ label: `${remaining} min (redondeo a 1h)`, rate: `$${pHour.toLocaleString()}/hr`, sub: pHour });
+    }
+  }
+  return lines;
+}
+
+function formatDuration(days, hours, mins) {
+  const parts = [];
+  if (days > 0)  parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (mins > 0)  parts.push(`${mins}min`);
+  return parts.length ? parts.join(' ') : '0 min';
+}
 
 function generateSpots(parking, tempLocks = new Set()) {
-  const total = Math.max(parking.total_spots || 8, 1);
+  const total    = Math.max(parking.total_spots || 8, 1);
   const occupied = Math.min(parking.occupied_spots || 0, total);
-  const hasPmr = parking.es_pmr;
+  const hasPmr   = parking.es_pmr;
 
   const seed = parking.id || 1;
-  const rng = (n) => ((seed * 1103515245 + n * 12345) & 0x7fffffff) % total;
+  const rng  = (n) => ((seed * 1103515245 + n * 12345) & 0x7fffffff) % total;
 
   const occupiedSet = new Set();
   let attempts = 0;
@@ -30,16 +99,16 @@ function generateSpots(parking, tempLocks = new Set()) {
   }
 
   return Array.from({ length: total }, (_, i) => {
-    const label = `${String.fromCharCode(65 + Math.floor(i / 6))}${(i % 6) + 1}`;
-    const isPmr = hasPmr && i >= total - 2;
+    const label      = `${String.fromCharCode(65 + Math.floor(i / 6))}${(i % 6) + 1}`;
+    const isPmr      = hasPmr && i >= total - 2;
     const isOccupied = occupiedSet.has(i);
     const isTempLocked = tempLocks.has(label);
 
     let status;
-    if (isOccupied)      status = 'occupied';
+    if (isOccupied)        status = 'occupied';
     else if (isTempLocked) status = 'reserved';
-    else if (isPmr)      status = 'pmr';
-    else                 status = 'available';
+    else if (isPmr)        status = 'pmr';
+    else                   status = 'available';
 
     return { id: i, label, status };
   });
@@ -54,16 +123,46 @@ const SPOT_STYLE = {
   reserved:  { bg: '#f59e0b', label: 'Reservada',    selectable: false },
 };
 
+// ── Stepper control ──
+function Stepper({ value, onChange, min = 0, max, step = 1, label, unit }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flex: 1 }}>
+      <span style={{ color: '#64748b', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px' }}>{label}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(0,0,0,0.3)', borderRadius: '12px', padding: '8px 12px', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <button
+          type="button"
+          onClick={() => onChange(Math.max(min, value - step))}
+          disabled={value <= min}
+          style={{ width: '28px', height: '28px', borderRadius: '8px', background: value > min ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: value > min ? '#60a5fa' : '#374151', cursor: value > min ? 'pointer' : 'not-allowed', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >−</button>
+        <span style={{ color: 'white', fontWeight: 900, fontSize: '1.3rem', minWidth: '32px', textAlign: 'center' }}>{value}</span>
+        <button
+          type="button"
+          onClick={() => onChange(max !== undefined ? Math.min(max, value + step) : value + step)}
+          disabled={max !== undefined && value >= max}
+          style={{ width: '28px', height: '28px', borderRadius: '8px', background: (max === undefined || value < max) ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: (max === undefined || value < max) ? '#60a5fa' : '#374151', cursor: (max === undefined || value < max) ? 'pointer' : 'not-allowed', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >+</button>
+      </div>
+      <span style={{ color: '#475569', fontSize: '0.72rem' }}>{unit}</span>
+    </div>
+  );
+}
+
 export default function ParkingSelector({ parking, onClose, onReserve, isReserving, tempLocks, authToken }) {
   const [step, setStep] = useState(STEP.SELECT);
   const [selectedSpot, setSelectedSpot] = useState(null);
-  const [duration, setDuration] = useState(DURATION_OPTIONS[1]);
+
+  // Duration state
+  const [customDays,  setCustomDays]  = useState(0);
+  const [customHours, setCustomHours] = useState(1);
+  const [customMins,  setCustomMins]  = useState(0);
+  const [activeQuick, setActiveQuick] = useState(1); // index in QUICK_DURATIONS
+
   const [payMethod, setPayMethod] = useState('webpay');
   const [reserveError, setReserveError] = useState(null);
-  const [lockError, setLockError] = useState(null);
-  const [lockingSpot, setLockingSpot] = useState(null);
+  const [lockError,    setLockError]    = useState(null);
+  const [lockingSpot,  setLockingSpot]  = useState(null);
 
-  // Track active lock for cleanup on unmount
   const activeLockRef = useRef(null);
   const [activeLockId, setActiveLockIdState] = useState(null);
   const setActiveLockId = (id) => { activeLockRef.current = id; setActiveLockIdState(id); };
@@ -78,7 +177,6 @@ export default function ParkingSelector({ parking, onClose, onReserve, isReservi
     } catch { /* ignore on cleanup */ }
   };
 
-  // Release lock on unmount if reservation was not completed
   useEffect(() => {
     return () => { if (activeLockRef.current) releaseLock(activeLockRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -89,7 +187,20 @@ export default function ParkingSelector({ parking, onClose, onReserve, isReservi
     [parking, tempLocks]
   );
 
-  const totalPrice = Math.round((parking.precio_hora || 0) * duration.hours);
+  // Apply a quick-select preset
+  const applyQuick = (idx) => {
+    const q = QUICK_DURATIONS[idx];
+    setActiveQuick(idx);
+    setCustomDays(q.days);
+    setCustomHours(q.hours);
+    setCustomMins(q.mins);
+  };
+
+  const totalMinutes = customDays * 1440 + customHours * 60 + customMins;
+  const durationHours = totalMinutes / 60;
+  const totalPrice   = calcTotal(customDays, customHours, customMins, parking);
+  const breakdown    = calcBreakdown(customDays, customHours, customMins, parking);
+  const durationLabel = formatDuration(customDays, customHours, customMins);
 
   const rows = useMemo(() => {
     const r = {};
@@ -101,12 +212,10 @@ export default function ParkingSelector({ parking, onClose, onReserve, isReservi
     return r;
   }, [spots]);
 
-  // ── Spot click: acquire temporary lock ──
   const handleSpotClick = async (spot) => {
     const cfg = SPOT_STYLE[spot.status] || SPOT_STYLE.available;
     if (!cfg.selectable || lockingSpot) return;
 
-    // Release previous lock if switching spots
     if (activeLockId && selectedSpot?.label !== spot.label) {
       releaseLock(activeLockId);
       setActiveLockId(null);
@@ -116,7 +225,6 @@ export default function ParkingSelector({ parking, onClose, onReserve, isReservi
     setLockingSpot(spot.label);
 
     if (!authToken) {
-      // No session: still allow selection but no server-side lock
       setSelectedSpot(spot);
       setLockingSpot(null);
       return;
@@ -129,7 +237,6 @@ export default function ParkingSelector({ parking, onClose, onReserve, isReservi
         body: JSON.stringify({ estacionamiento_id: parking.id, spot_label: spot.label }),
       });
       const data = await res.json();
-
       if (data.success) {
         setActiveLockId(data.lockId);
         setSelectedSpot(spot);
@@ -138,25 +245,22 @@ export default function ParkingSelector({ parking, onClose, onReserve, isReservi
         setSelectedSpot(null);
       }
     } catch {
-      // Network issue: allow selection without lock
       setSelectedSpot(spot);
     } finally {
       setLockingSpot(null);
     }
   };
 
-  // ── Step 2 → Step 3 ──
   const handleProceedToPayment = () => {
     setReserveError(null);
     setStep(STEP.PAYMENT);
   };
 
-  // ── Step 3 → reservation + payment ──
   const handlePayment = async () => {
     setReserveError(null);
     setStep(STEP.PROCESSING);
 
-    const result = await onReserve({ spotLabel: selectedSpot.label, durationHours: duration.hours });
+    const result = await onReserve({ spotLabel: selectedSpot.label, durationHours });
 
     if (result?.success === false) {
       setReserveError(result.error || 'No se pudo completar la reserva.');
@@ -164,7 +268,6 @@ export default function ParkingSelector({ parking, onClose, onReserve, isReservi
       return;
     }
 
-    // Record payment (best-effort; reservation already created)
     if (authToken && totalPrice > 0) {
       try {
         await fetch('/api/pagos', {
@@ -177,10 +280,9 @@ export default function ParkingSelector({ parking, onClose, onReserve, isReservi
             metadata: { spot_label: selectedSpot.label, parking_id: parking.id },
           }),
         });
-      } catch { /* payment logging failure doesn't block success */ }
+      } catch { /* payment logging doesn't block success */ }
     }
 
-    // Lock was consumed by the reservation — clear ref so cleanup doesn't double-delete
     setActiveLockId(null);
     setStep(STEP.SUCCESS);
   };
@@ -189,6 +291,9 @@ export default function ParkingSelector({ parking, onClose, onReserve, isReservi
     if (activeLockRef.current) { releaseLock(activeLockRef.current); setActiveLockId(null); }
     onClose();
   };
+
+  // ── Pricing header: show which rates are configured ──
+  const hasPricing = parking.precio_hora || parking.price_per_day || parking.price_per_minute;
 
   return (
     <div
@@ -204,9 +309,10 @@ export default function ParkingSelector({ parking, onClose, onReserve, isReservi
               <i className="fa-solid fa-square-parking" style={{ color: '#3b82f6', fontSize: '1.1rem' }}></i>
               <h2 style={{ color: '#f8fafc', fontWeight: 800, fontSize: '1.1rem', margin: 0 }}>{parking.nombre}</h2>
             </div>
-            <div style={{ display: 'flex', gap: '12px', color: '#94a3b8', fontSize: '0.82rem' }}>
+            <div style={{ display: 'flex', gap: '12px', color: '#94a3b8', fontSize: '0.82rem', flexWrap: 'wrap' }}>
               {parking.comuna && <span><i className="fa-solid fa-location-dot" style={{ marginRight: '4px', color: '#64748b' }}></i>{parking.comuna}</span>}
-              <span style={{ color: '#f59e0b', fontWeight: 700 }}>${parking.precio_hora?.toLocaleString()}/hr</span>
+              {parking.precio_hora > 0 && <span style={{ color: '#f59e0b', fontWeight: 700 }}>${parking.precio_hora?.toLocaleString()}/hr</span>}
+              {parking.price_per_day > 0 && <span style={{ color: '#a78bfa', fontWeight: 700 }}>${parking.price_per_day?.toLocaleString()}/día</span>}
               {parking.es_pmr && <span style={{ color: '#38bdf8' }}><i className="fa-solid fa-wheelchair" style={{ marginRight: '4px' }}></i>PMR</span>}
             </div>
           </div>
@@ -218,7 +324,7 @@ export default function ParkingSelector({ parking, onClose, onReserve, isReservi
         {/* Step indicator */}
         <div style={{ padding: '12px 24px', display: 'flex', gap: '8px', alignItems: 'center' }}>
           {[['Elige plaza', 1], ['Duración', 2], ['Pago', 3], ['Listo', 4]].map(([label, n]) => {
-            const done = step > n;
+            const done   = step > n;
             const active = step === n || (step === STEP.PROCESSING && n === 3) || (step === STEP.SUCCESS && n === 4);
             return (
               <div key={n} style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: n < 4 ? 1 : undefined }}>
@@ -238,7 +344,6 @@ export default function ParkingSelector({ parking, onClose, onReserve, isReservi
           {/* ── STEP 1: Seat selector ── */}
           {step === STEP.SELECT && (
             <>
-              {/* Legend */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '14px' }}>
                 {Object.entries(SPOT_STYLE).map(([key, cfg]) => (
                   <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#94a3b8', fontSize: '0.73rem' }}>
@@ -258,7 +363,6 @@ export default function ParkingSelector({ parking, onClose, onReserve, isReservi
                 <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.04)' }}></div>
               </div>
 
-              {/* Grid */}
               <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '16px', padding: '16px', border: '1px solid rgba(255,255,255,0.04)' }}>
                 {Object.entries(rows).map(([rowLabel, rowSpots]) => (
                   <div key={rowLabel} style={{ display: 'flex', gap: '8px', marginBottom: '10px', alignItems: 'center' }}>
@@ -266,8 +370,8 @@ export default function ParkingSelector({ parking, onClose, onReserve, isReservi
                     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                       {rowSpots.map(spot => {
                         const isSelected = selectedSpot?.id === spot.id;
-                        const isLocking = lockingSpot === spot.label;
-                        const cfg = SPOT_STYLE[spot.status] || SPOT_STYLE.available;
+                        const isLocking  = lockingSpot === spot.label;
+                        const cfg        = SPOT_STYLE[spot.status] || SPOT_STYLE.available;
                         return (
                           <button
                             key={spot.id}
@@ -285,17 +389,17 @@ export default function ParkingSelector({ parking, onClose, onReserve, isReservi
                               opacity: cfg.selectable ? 1 : 0.4,
                               transition: 'all 0.15s',
                               transform: isSelected ? 'scale(1.12)' : 'scale(1)',
-                              boxShadow: isSelected ? `0 0 14px #f59e0b99` : 'none',
+                              boxShadow: isSelected ? '0 0 14px #f59e0b99' : 'none',
                               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '2px',
                             }}
                           >
                             {isLocking
                               ? <i className="fa-solid fa-circle-notch fa-spin" style={{ fontSize: '0.65rem' }}></i>
                               : <>
-                                  {spot.status === 'pmr'      && <i className="fa-solid fa-wheelchair"  style={{ fontSize: '0.68rem' }}></i>}
-                                  {spot.status === 'occupied' && <i className="fa-solid fa-lock"        style={{ fontSize: '0.6rem'  }}></i>}
-                                  {spot.status === 'reserved' && <i className="fa-solid fa-clock"       style={{ fontSize: '0.6rem'  }}></i>}
-                                  {(spot.status === 'available' || (spot.status === 'pmr' && false)) && !isSelected && <i className="fa-solid fa-car" style={{ fontSize: '0.6rem' }}></i>}
+                                  {spot.status === 'pmr'      && <i className="fa-solid fa-wheelchair" style={{ fontSize: '0.68rem' }}></i>}
+                                  {spot.status === 'occupied' && <i className="fa-solid fa-lock"       style={{ fontSize: '0.6rem'  }}></i>}
+                                  {spot.status === 'reserved' && <i className="fa-solid fa-clock"      style={{ fontSize: '0.6rem'  }}></i>}
+                                  {(spot.status === 'available' || spot.status === 'pmr') && <i className="fa-solid fa-car" style={{ fontSize: '0.6rem' }}></i>}
                                   {isSelected && <i className="fa-solid fa-car" style={{ fontSize: '0.6rem' }}></i>}
                                 </>
                             }
@@ -338,8 +442,9 @@ export default function ParkingSelector({ parking, onClose, onReserve, isReservi
           {/* ── STEP 2: Duration ── */}
           {step === STEP.CONFIRM && (
             <div>
-              <div style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: '14px', padding: '16px', marginBottom: '20px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+              {/* Selected spot summary */}
+              <div style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: '14px', padding: '14px 16px', marginBottom: '18px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                   <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Plaza seleccionada</span>
                   <span style={{ color: '#f59e0b', fontWeight: 800, fontSize: '1rem' }}>{selectedSpot?.label}</span>
                 </div>
@@ -349,36 +454,66 @@ export default function ParkingSelector({ parking, onClose, onReserve, isReservi
                 </div>
               </div>
 
-              <p style={{ color: '#94a3b8', fontSize: '0.85rem', fontWeight: 600, marginBottom: '10px' }}>¿Cuánto tiempo necesitas?</p>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '8px', marginBottom: '20px' }}>
-                {DURATION_OPTIONS.map(opt => (
+              {/* Quick duration pills */}
+              <p style={{ color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '1px' }}>Selección rápida</p>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '18px' }}>
+                {QUICK_DURATIONS.map((q, idx) => (
                   <button
-                    key={opt.label}
-                    onClick={() => setDuration(opt)}
-                    style={{ padding: '10px 6px', borderRadius: '10px', border: duration.label === opt.label ? '2px solid #3b82f6' : '1px solid rgba(255,255,255,0.08)', background: duration.label === opt.label ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.03)', color: duration.label === opt.label ? '#60a5fa' : '#94a3b8', fontWeight: 700, cursor: 'pointer', fontSize: '0.82rem', transition: 'all 0.15s' }}
+                    key={q.label}
+                    type="button"
+                    onClick={() => applyQuick(idx)}
+                    style={{ padding: '7px 14px', borderRadius: '20px', border: activeQuick === idx ? '2px solid #3b82f6' : '1px solid rgba(255,255,255,0.08)', background: activeQuick === idx ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.03)', color: activeQuick === idx ? '#60a5fa' : '#94a3b8', fontWeight: 700, cursor: 'pointer', fontSize: '0.82rem', transition: 'all 0.15s', whiteSpace: 'nowrap' }}
                   >
-                    {opt.label}
+                    {q.label}
                   </button>
                 ))}
               </div>
 
-              <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', color: '#94a3b8', fontSize: '0.83rem' }}>
-                  <span>Tarifa</span><span>${parking.precio_hora?.toLocaleString()}/hr × {duration.hours}h</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                  <span style={{ color: '#e2e8f0', fontWeight: 700 }}>Total estimado</span>
-                  <span style={{ color: '#10b981', fontWeight: 900, fontSize: '1.1rem' }}>${totalPrice.toLocaleString()}</span>
-                </div>
+              {/* Manual steppers */}
+              <p style={{ color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>O ajusta manualmente</p>
+              <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
+                <Stepper value={customDays}  onChange={v => { setCustomDays(v);  setActiveQuick(null); }} min={0} max={30}  label="Días"    unit="días" />
+                <Stepper value={customHours} onChange={v => { setCustomHours(v); setActiveQuick(null); }} min={0} max={23}  label="Horas"   unit="horas" />
+                <Stepper value={customMins}  onChange={v => { setCustomMins(v);  setActiveQuick(null); }} min={0} max={45} step={15} label="Minutos" unit="min" />
               </div>
+
+              {/* Price breakdown */}
+              {totalMinutes > 0 ? (
+                <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '12px', padding: '14px 16px', marginBottom: '20px' }}>
+                  {breakdown.length > 0 ? (
+                    <>
+                      {breakdown.map((line, i) => (
+                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', color: '#94a3b8', fontSize: '0.82rem' }}>
+                          <span>{line.label} <span style={{ color: '#475569' }}>× {line.rate}</span></span>
+                          <span style={{ color: '#cbd5e1', fontWeight: 700 }}>${Math.round(line.sub).toLocaleString()}</span>
+                        </div>
+                      ))}
+                      <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '10px', marginTop: '6px', display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: '#e2e8f0', fontWeight: 700 }}>Total estimado</span>
+                        <span style={{ color: '#10b981', fontWeight: 900, fontSize: '1.1rem' }}>${totalPrice.toLocaleString()}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#e2e8f0', fontWeight: 700 }}>Duración</span>
+                      <span style={{ color: '#10b981', fontWeight: 900 }}>{durationLabel} — Gratis</span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', padding: '10px 14px', color: '#fca5a5', fontSize: '0.83rem', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <i className="fa-solid fa-circle-exclamation"></i> Selecciona una duración mayor a 0 minutos.
+                </div>
+              )}
 
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button onClick={() => setStep(STEP.SELECT)} style={{ padding: '12px 16px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', color: '#94a3b8', cursor: 'pointer', fontWeight: 700 }}>
                   <i className="fa-solid fa-arrow-left"></i>
                 </button>
                 <button
+                  disabled={totalMinutes <= 0}
                   onClick={handleProceedToPayment}
-                  style={{ flex: 1, padding: '14px', background: 'linear-gradient(135deg,#3b82f6,#6366f1)', border: 'none', borderRadius: '12px', color: 'white', fontWeight: 800, cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                  style={{ flex: 1, padding: '14px', background: totalMinutes > 0 ? 'linear-gradient(135deg,#3b82f6,#6366f1)' : 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '12px', color: totalMinutes > 0 ? 'white' : '#475569', fontWeight: 800, cursor: totalMinutes > 0 ? 'pointer' : 'not-allowed', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
                 >
                   Ir al pago <i className="fa-solid fa-arrow-right"></i>
                 </button>
@@ -389,13 +524,12 @@ export default function ParkingSelector({ parking, onClose, onReserve, isReservi
           {/* ── STEP 3: Payment ── */}
           {step === STEP.PAYMENT && (
             <div>
-              {/* Order summary */}
               <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '14px', padding: '16px', marginBottom: '20px', border: '1px solid rgba(255,255,255,0.05)' }}>
                 <p style={{ color: '#64748b', fontSize: '0.73rem', letterSpacing: '1.5px', textTransform: 'uppercase', marginBottom: '12px', fontWeight: 700 }}>Resumen de reserva</p>
                 {[
                   ['Estacionamiento', parking.nombre],
-                  ['Plaza', selectedSpot?.label],
-                  ['Duración', duration.label],
+                  ['Plaza',           selectedSpot?.label],
+                  ['Duración',        durationLabel],
                   ['Ingreso estimado', new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })],
                 ].map(([k, v]) => (
                   <div key={k} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
@@ -409,7 +543,6 @@ export default function ParkingSelector({ parking, onClose, onReserve, isReservi
                 </div>
               </div>
 
-              {/* Payment methods */}
               <p style={{ color: '#94a3b8', fontSize: '0.85rem', fontWeight: 600, marginBottom: '10px' }}>Método de pago</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
                 {PAY_METHODS.map(m => (
@@ -470,7 +603,7 @@ export default function ParkingSelector({ parking, onClose, onReserve, isReservi
               </div>
               <h3 style={{ color: '#10b981', fontWeight: 800, fontSize: '1.2rem', marginBottom: '8px' }}>¡Reserva Confirmada!</h3>
               <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '20px' }}>
-                Plaza <strong style={{ color: '#f59e0b' }}>{selectedSpot?.label}</strong> en {parking.nombre} — {duration.label}
+                Plaza <strong style={{ color: '#f59e0b' }}>{selectedSpot?.label}</strong> en {parking.nombre} — {durationLabel}
               </p>
               <div style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '12px', padding: '14px', marginBottom: '20px' }}>
                 <p style={{ color: '#94a3b8', fontSize: '0.82rem', margin: 0 }}>Total pagado</p>

@@ -28,6 +28,23 @@ export default function DashboardPage() {
   const [lng, setLng] = useState('');
   const [totalSpots, setTotalSpots] = useState(1);
   const [esPmr, setEsPmr] = useState(false);
+
+  // Pricing
+  const [precioHora,     setPrecioHora]     = useState('');
+  const [pricePerMinute, setPricePerMinute] = useState('');
+  const [pricePerDay,    setPricePerDay]    = useState('');
+
+  // Vehicle types
+  const VEHICLE_TYPES = [
+    { id: 'car',        label: 'Auto',      icon: 'fa-car'           },
+    { id: 'motorcycle', label: 'Moto',      icon: 'fa-motorcycle'    },
+    { id: 'bicycle',    label: 'Bicicleta', icon: 'fa-bicycle'       },
+    { id: 'scooter',    label: 'Scooter',   icon: 'fa-person-biking' },
+  ];
+  const [allowedVehicleTypes, setAllowedVehicleTypes] = useState(['car']);
+  const toggleVehicle = (id) => setAllowedVehicleTypes(prev =>
+    prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id]
+  );
   const [selectedIds, setSelectedIds] = useState([]);
   const [toast, setToast] = useState(null);
   const [reservasRecibidas, setReservasRecibidas] = useState([]);
@@ -134,11 +151,17 @@ export default function DashboardPage() {
         totalSpots: parseInt(totalSpots),
         esPmr,
         userId: session.user.id,
+        precioHora:         precioHora     ? parseFloat(precioHora)     : undefined,
+        pricePerMinute:     pricePerMinute ? parseFloat(pricePerMinute) : undefined,
+        pricePerDay:        pricePerDay    ? parseFloat(pricePerDay)    : undefined,
+        allowedVehicleTypes: allowedVehicleTypes.length > 0 ? allowedVehicleTypes : ['car'],
       });
 
       if (result.success && result.data) {
         setMyParkings(prev => [result.data, ...prev]);
         setNombre(''); setDireccion(''); setLat(''); setLng(''); setTotalSpots(1); setEsPmr(false);
+        setPrecioHora(''); setPricePerMinute(''); setPricePerDay('');
+        setAllowedVehicleTypes(['car']);
         showToast('¡Estacionamiento publicado con éxito!', 'success');
       }
     } catch (err) {
@@ -321,7 +344,59 @@ export default function DashboardPage() {
                 </div>
               </div>
               
-              {/* 3. Publicar nodo */}
+              {/* 3. Tarifas */}
+              <div className="form-block">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                  <i className="fa-solid fa-coins" style={{ color: '#f59e0b' }}></i>
+                  <span style={{ color: 'white', fontWeight: 700, fontSize: '1rem' }}>Configuración de Tarifas</span>
+                </div>
+                <div className="input-row" style={{ flexDirection: 'row' }}>
+                  <div className="input-group" style={{ flex: 1 }}>
+                    <i className="fa-solid fa-clock icon"></i>
+                    <input type="number" min="0" placeholder="Por hora (CLP)" value={precioHora} onChange={e => setPrecioHora(e.target.value)} />
+                  </div>
+                  <div className="input-group" style={{ flex: 1 }}>
+                    <i className="fa-solid fa-stopwatch icon"></i>
+                    <input type="number" min="0" placeholder="Por minuto (CLP)" value={pricePerMinute} onChange={e => setPricePerMinute(e.target.value)} />
+                  </div>
+                  <div className="input-group" style={{ flex: 1 }}>
+                    <i className="fa-solid fa-calendar-day icon"></i>
+                    <input type="number" min="0" placeholder="Por día (CLP)" value={pricePerDay} onChange={e => setPricePerDay(e.target.value)} />
+                  </div>
+                </div>
+                <p style={{ color: '#64748b', fontSize: '0.78rem', marginTop: '6px' }}>Define las tarifas disponibles. El sistema aplica automáticamente la combinación más conveniente para el usuario.</p>
+              </div>
+
+              {/* 4. Vehículos admitidos */}
+              <div className="form-block">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                  <i className="fa-solid fa-car" style={{ color: '#3b82f6' }}></i>
+                  <span style={{ color: 'white', fontWeight: 700, fontSize: '1rem' }}>Vehículos Admitidos</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '10px' }}>
+                  {[
+                    { id: 'car',        label: 'Auto',      icon: 'fa-car'           },
+                    { id: 'motorcycle', label: 'Moto',      icon: 'fa-motorcycle'    },
+                    { id: 'bicycle',    label: 'Bicicleta', icon: 'fa-bicycle'       },
+                    { id: 'scooter',    label: 'Scooter',   icon: 'fa-person-biking' },
+                  ].map(v => {
+                    const active = allowedVehicleTypes.includes(v.id);
+                    return (
+                      <button
+                        key={v.id}
+                        type="button"
+                        onClick={() => toggleVehicle(v.id)}
+                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: '14px 8px', borderRadius: '12px', border: active ? '2px solid #3b82f6' : '1px solid rgba(255,255,255,0.08)', background: active ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.03)', color: active ? '#60a5fa' : '#64748b', cursor: 'pointer', transition: 'all 0.15s', fontWeight: 700, fontSize: '0.75rem' }}
+                      >
+                        <i className={`fa-solid ${v.icon}`} style={{ fontSize: '1.3rem' }}></i>
+                        {v.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 5. Publicar */}
               <div className="form-block">
                 <button type="submit" className="btn-cyber-primary submit-btn" style={{width: '100%'}}>
                   <i className="fa-solid fa-cloud-arrow-up"></i> PUBLICAR ESTACIONAMIENTO

@@ -124,8 +124,10 @@ export function useMapRadar() {
 
       setReserveStep(2);
 
-      const fecha_inicio = new Date().toISOString();
-      const fecha_fin = new Date(Date.now() + durationHours * 3600 * 1000).toISOString();
+      // +30s buffer absorbs clock skew between client and Postgres now()
+      const startMs = Date.now() + 30_000;
+      const fecha_inicio = new Date(startMs).toISOString();
+      const fecha_fin    = new Date(startMs + durationHours * 3600 * 1000).toISOString();
 
       const resData = await api.reservas.crearReserva({
         parking_id: selectedSpot.id,

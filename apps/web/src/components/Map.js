@@ -94,6 +94,10 @@ export default function Map({
     const filteredParkings = parkings.filter(spot => {
       if (filters.p2p && !spot.arrendador) return false;
       if (filters.pmr && !spot.es_pmr)     return false;
+      // Vehicle filter: hide spots that don't include the selected vehicle type.
+      // Spots without allowed_vehicle_types (legacy) are always shown for backward compat.
+      if (filters.vehicle && spot.allowed_vehicle_types?.length > 0
+          && !spot.allowed_vehicle_types.includes(filters.vehicle)) return false;
       return true;
     });
 

@@ -146,7 +146,12 @@ export async function POST(request) {
       occupied_spots: 0,
       es_pmr: body.esPmr || false,
       user_id: user.id,
-      precio_hora: parseInt(body.precioHora) || 1500,
+      precio_hora: body.precioHora ? Math.round(parseFloat(body.precioHora)) : 1500,
+      price_per_minute: body.pricePerMinute ? parseFloat(body.pricePerMinute) : null,
+      price_per_day: body.pricePerDay ? Math.round(parseFloat(body.pricePerDay)) : null,
+      allowed_vehicle_types: Array.isArray(body.allowedVehicleTypes) && body.allowedVehicleTypes.length > 0
+        ? body.allowedVehicleTypes
+        : ['car'],
       comuna: body.comuna || null,
     };
 
