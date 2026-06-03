@@ -40,8 +40,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     // Detectar si está en Vercel
-    const url = process.env.NEXT_PUBLIC_MS_MAPAS_URL || 'localhost';
-    if (url.includes('vercel.app') || window.location.hostname.includes('vercel.app')) {
+    if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) {
       setIsCloud(true);
     }
 
