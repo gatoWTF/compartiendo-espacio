@@ -91,7 +91,7 @@ export default function HomePage() {
       </section>
 
       <footer className="landing-footer">
-        <p style={{ color: '#475569', fontSize: '0.85rem' }}>Parkings Together © 2026 — Plataforma P2P de estacionamientos</p>
+        <p style={{ color: '#475569', fontSize: '0.85rem' }}>Parkings Together © 2026 — Plataforma de estacionamientos compartidos</p>
         <p className="sub">Gabriel Molina & Guillermo Santander</p>
       </footer>
 

@@ -130,10 +130,10 @@ export default function AuthPage() {
         {!successAnim ? (
           <>
             <div className="brand-logo">
-              <i className={isLogin ? "fa-solid fa-fingerprint" : "fa-solid fa-satellite-dish"}></i>
+              <i className={isLogin ? "fa-solid fa-fingerprint" : "fa-solid fa-user-plus"}></i>
             </div>
-            <h2>{isLogin ? 'Acceso Seguro' : 'Registro en la Red'}</h2>
-            <p className="auth-subtitle">P2P DISTRIBUIDO - COMPARTIENDO ESPACIO</p>
+            <h2>{isLogin ? 'Iniciar sesión' : 'Crear mi cuenta'}</h2>
+            <p className="auth-subtitle">Estacionamientos compartidos · Simple y seguro</p>
 
             <form onSubmit={handleSubmit(onSubmit)} className="auth-form">
               {!isLogin && (
@@ -175,16 +175,16 @@ export default function AuthPage() {
                   <span className="btn-content"><i className="fa-solid fa-spinner fa-spin"></i> PROCESANDO...</span>
                 ) : (
                   <span className="btn-content">
-                    {isLogin ? <><i className="fa-solid fa-right-to-bracket"></i> CONECTAR</> : <><i className="fa-solid fa-bolt"></i> CREAR NODO</>}
+                    {isLogin ? <><i className="fa-solid fa-right-to-bracket"></i> Ingresar</> : <><i className="fa-solid fa-user-plus"></i> Crear mi cuenta</>}
                   </span>
                 )}
               </button>
             </form>
 
             <div className="auth-footer-text">
-              {isLogin ? '¿Primera vez en la red?' : '¿Ya tienes acceso?'}{' '}
+              {isLogin ? '¿No tienes cuenta?' : '¿Ya tienes cuenta?'}{' '}
               <span onClick={toggleMode} className="toggle-link">
-                {isLogin ? 'ÚNETE AQUÍ' : 'INICIAR SESIÓN'}
+                {isLogin ? 'Regístrate gratis' : 'Inicia sesión'}
               </span>
             </div>
           </>
@@ -204,8 +204,8 @@ export default function AuthPage() {
             <div className="success-circle">
               <i className="fa-solid fa-check"></i>
             </div>
-            <h3>{isLogin ? 'Autenticación Verificada' : 'Nodo Creado'}</h3>
-            <p>Conectando con Supabase Auth...</p>
+            <h3>{isLogin ? '¡Sesión iniciada!' : '¡Cuenta creada!'}</h3>
+            <p>Redirigiendo al mapa...</p>
           </div>
         )}
       </div>
@@ -216,7 +216,7 @@ export default function AuthPage() {
         .success-mode { background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.3); transform: scale(1.02); }
         .brand-logo { width: 80px; height: 80px; background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(37, 99, 235, 0.1)); border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 24px; margin: 0 auto 30px; display: flex; align-items: center; justify-content: center; color: #3b82f6; font-size: 2.2rem; box-shadow: inset 0 0 20px rgba(59, 130, 246, 0.2), 0 0 30px rgba(59, 130, 246, 0.1); }
         h2 { color: white; font-size: 2.2rem; font-weight: 900; margin: 0; letter-spacing: -1px; }
-        .auth-subtitle { font-size: 0.7rem; color: #3b82f6; letter-spacing: 4px; margin: 15px 0 35px 0; font-weight: 900; }
+        .auth-subtitle { font-size: 0.8rem; color: #64748b; letter-spacing: 1px; margin: 10px 0 35px 0; font-weight: 500; }
         
         .input-wrap { position: relative; margin-bottom: 20px; transition: all 0.3s; text-align: left; }
         .input-wrap .icon { position: absolute; left: 20px; top: 18px; color: #64748b; font-size: 1.1rem; transition: 0.3s; }

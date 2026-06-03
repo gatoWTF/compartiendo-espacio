@@ -178,7 +178,7 @@ export default function ProfilePage() {
         requiere_pmr: newValue
       });
       if (error) throw error;
-      toast.success(newValue ? 'Filtro PMR Activado' : 'Filtro PMR Desactivado');
+      toast.success(newValue ? 'Mostrando solo estacionamientos accesibles' : 'Mostrando todos los estacionamientos');
     } catch (error) {
       setPerfil(prev => ({ ...prev, requiere_pmr: !newValue }));
       toast.error('Error al actualizar preferencias');
@@ -480,7 +480,7 @@ export default function ProfilePage() {
                             <span>
                               {est.comuna ? `${est.comuna} · ` : ''}
                               {est.precio_hora != null ? (est.precio_hora === 0 ? 'Gratuito' : `$${Number(est.precio_hora).toLocaleString('es-CL')}/hr`) : ''}
-                              {est.es_pmr ? ' · ♿ PMR' : ''}
+                              {est.es_pmr ? ' · ♿ Accesible' : ''}
                             </span>
                             {est.rating > 0 && (
                               <span style={{ color: '#f59e0b', fontSize: '0.8rem' }}>
@@ -511,8 +511,8 @@ export default function ProfilePage() {
                 <div className="pmr-info">
                   <i className="fa-solid fa-wheelchair"></i>
                   <div>
-                    <h3>Plazas de Movilidad Reducida (PMR)</h3>
-                    <p>Filtra el mapa para mostrar exclusivamente estacionamientos con garantía de accesibilidad.</p>
+                    <h3>Estacionamientos accesibles</h3>
+                    <p>Filtra el mapa para mostrar solo estacionamientos con acceso garantizado para personas con movilidad reducida.</p>
                   </div>
                 </div>
                 <div className="toggle-switch">

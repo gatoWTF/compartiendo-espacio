@@ -136,7 +136,7 @@ export function useMapRadar() {
       });
 
       if (!resData.success) {
-        throw new Error(resData.error || 'Error al completar la transacción P2P.');
+        throw new Error(resData.error || 'No se pudo completar la reserva.');
       }
 
       setReserveStep(3);

@@ -355,7 +355,7 @@ export default function DashboardPage() {
               <div className="checkbox-pmr" style={{ cursor: 'pointer' }}>
                 <input type="checkbox" id="edit-pmr" checked={editEsPmr} onChange={e => setEditEsPmr(e.target.checked)} style={{ width: '20px', height: '20px', accentColor: '#38bdf8' }} />
                 <label htmlFor="edit-pmr" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'white', fontWeight: 700 }}>
-                  <i className="fa-solid fa-wheelchair" style={{ color: '#38bdf8' }}></i> Zona Prioritaria PMR
+                  <i className="fa-solid fa-wheelchair" style={{ color: '#38bdf8' }}></i> Acceso para movilidad reducida
                 </label>
               </div>
               {/* Tarifas */}
@@ -458,7 +458,7 @@ export default function DashboardPage() {
               <div className="kpi-icon purple"><i className="fa-solid fa-wheelchair"></i></div>
               <div className="kpi-data">
                 <span className="kpi-value">{myParkings.filter(p => p.es_pmr).length}</span>
-                <span className="kpi-label">Zonas PMR</span>
+                <span className="kpi-label">Acceso movilidad</span>
               </div>
             </div>
           </div>
@@ -500,7 +500,7 @@ export default function DashboardPage() {
                 <div className="checkbox-pmr">
                   <input type="checkbox" id="pmr-check" checked={esPmr} onChange={e => setEsPmr(e.target.checked)} style={{width: '20px', height: '20px', accentColor: '#38bdf8'}} />
                   <label htmlFor="pmr-check" style={{display: 'flex', flexDirection: 'column', cursor: 'pointer'}}>
-                    <span style={{color: 'white', fontSize: '1.05rem', fontWeight: 700}}><i className="fa-solid fa-wheelchair" style={{marginRight: '8px', color: '#38bdf8'}}></i> Habilitar Zona Prioritaria PMR</span>
+                    <span style={{color: 'white', fontSize: '1.05rem', fontWeight: 700}}><i className="fa-solid fa-wheelchair" style={{marginRight: '8px', color: '#38bdf8'}}></i> Plaza accesible para personas con movilidad reducida</span>
                     <span style={{color: '#94a3b8', fontSize: '0.85rem', marginTop: '4px'}}>Destaca este estacionamiento para usuarios con movilidad reducida.</span>
                   </label>
                 </div>

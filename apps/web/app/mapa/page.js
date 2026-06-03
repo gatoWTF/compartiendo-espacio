@@ -4,6 +4,7 @@ import { useMapRadar } from '../../src/hooks/useMapRadar';
 import { api } from '../../src/lib/api';
 import { supabase } from '@parkings/supabase-db';
 import dynamic from 'next/dynamic';
+import { REGIONES, detectarRegion } from '../../src/lib/comunas-chile';
 
 const Map = dynamic(() => import('../../src/components/Map'), { ssr: false });
 const ParkingSelector = dynamic(() => import('../../src/components/ParkingSelector'), { ssr: false });
@@ -16,10 +17,26 @@ export default function MapaPageContainer() {
   // ── Búsqueda avanzada ──
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQ, setSearchQ] = useState('');
+  const [searchRegion, setSearchRegion] = useState('');
   const [searchComuna, setSearchComuna] = useState('');
   const [searchPmr, setSearchPmr] = useState(false);
   const [searchDisponible, setSearchDisponible] = useState(false);
+  const [searchPrecioMin, setSearchPrecioMin] = useState('');
   const [searchPrecioMax, setSearchPrecioMax] = useState('');
+
+  // Comunas disponibles según la región seleccionada
+  const comunasDisponibles = searchRegion
+    ? (REGIONES.find(r => r.id === searchRegion)?.comunas || [])
+    : [];
+
+  // Auto-detectar región desde GPS cuando el panel de búsqueda se abre
+  useEffect(() => {
+    if (!searchOpen || searchRegion) return;
+    const { lat, lng } = state.userLoc || {};
+    if (!lat || !lng) return;
+    const region = detectarRegion(lat, lng);
+    if (region) setSearchRegion(region.id);
+  }, [searchOpen]);
 
   // ── Selector de plaza ──
   const [selectorOpen, setSelectorOpen] = useState(false);
@@ -55,14 +72,12 @@ export default function MapaPageContainer() {
   }, [favIds]);
 
   const handleBusquedaAvanzada = () => {
-    // Aplica los filtros de texto/comuna pasando parámetros al hook via URL
-    // El hook useMapRadar ya llama a /api/mapas/search; para búsqueda avanzada
-    // hacemos el fetch directo aquí y lo inyectamos al estado del hook.
     const filtros = {};
-    if (searchQ) filtros.q = searchQ;
-    if (searchComuna) filtros.comuna = searchComuna;
-    if (searchPmr) filtros.pmr = 'true';
+    if (searchQ)        filtros.q         = searchQ;
+    if (searchComuna)   filtros.comuna    = searchComuna;
+    if (searchPmr)      filtros.pmr       = 'true';
     if (searchDisponible) filtros.disponible = 'true';
+    if (searchPrecioMin) filtros.precioMin = searchPrecioMin;
     if (searchPrecioMax) filtros.precioMax = searchPrecioMax;
     api.mapas.buscar(filtros).then(res => {
       if (res.success) actions.setParkingsOverride?.(res.data);
@@ -148,19 +163,19 @@ export default function MapaPageContainer() {
           {/* Filtros Rápidos (Switches) */}
           <div className="control-group">
             <div className="filter-row">
-              <span className="switch-text">Mostrar solo P2P</span>
+              <span className="switch-text">Solo entre personas</span>
               <label className="modern-switch">
-                <input 
-                  type="checkbox" 
-                  checked={filters.p2p} 
-                  onChange={(e) => setFilters({...filters, p2p: e.target.checked})} 
+                <input
+                  type="checkbox"
+                  checked={filters.p2p}
+                  onChange={(e) => setFilters({...filters, p2p: e.target.checked})}
                 />
                 <span className="slider round"></span>
               </label>
             </div>
 
             <div className="filter-row">
-              <span className="switch-text text-blue-400">Mostrar PMR</span>
+              <span className="switch-text text-blue-400">Acceso para movilidad reducida</span>
               <label className="modern-switch">
                 <input
                   type="checkbox"
@@ -241,21 +256,59 @@ export default function MapaPageContainer() {
             value={searchQ}
             onChange={e => setSearchQ(e.target.value)}
           />
-          <input
+
+          {/* Selector de Región */}
+          <select
             className="search-input"
-            placeholder="Comuna (ej: Providencia)"
-            value={searchComuna}
-            onChange={e => setSearchComuna(e.target.value)}
+            value={searchRegion}
+            onChange={e => { setSearchRegion(e.target.value); setSearchComuna(''); }}
             style={{ marginTop: '8px' }}
-          />
-          <input
-            className="search-input"
-            placeholder="Precio máx / hora (CLP)"
-            type="number"
-            value={searchPrecioMax}
-            onChange={e => setSearchPrecioMax(e.target.value)}
-            style={{ marginTop: '8px' }}
-          />
+          >
+            <option value="">Todas las regiones</option>
+            {REGIONES.map(r => (
+              <option key={r.id} value={r.id}>{r.nombre}</option>
+            ))}
+          </select>
+
+          {/* Selector de Comuna (depende de región) */}
+          {comunasDisponibles.length > 0 && (
+            <select
+              className="search-input"
+              value={searchComuna}
+              onChange={e => setSearchComuna(e.target.value)}
+              style={{ marginTop: '8px' }}
+            >
+              <option value="">Todas las comunas</option>
+              {comunasDisponibles.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          )}
+
+          {/* Rango de precio */}
+          <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+            <input
+              className="search-input"
+              placeholder="Precio mín"
+              type="number"
+              min="0"
+              value={searchPrecioMin}
+              onChange={e => setSearchPrecioMin(e.target.value)}
+              style={{ flex: 1 }}
+            />
+            <input
+              className="search-input"
+              placeholder="Precio máx"
+              type="number"
+              min="0"
+              value={searchPrecioMax}
+              onChange={e => setSearchPrecioMax(e.target.value)}
+              style={{ flex: 1 }}
+            />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 4px', fontSize: '0.68rem', color: '#475569' }}>
+            <span>Precio / hora (CLP)</span>
+          </div>
 
           <div className="panel-divider" style={{ margin: '12px 0' }}></div>
 
@@ -267,7 +320,7 @@ export default function MapaPageContainer() {
             </label>
           </div>
           <div className="filter-row">
-            <span className="switch-text text-blue-400">Solo PMR</span>
+            <span className="switch-text text-blue-400">Acceso movilidad reducida</span>
             <label className="modern-switch">
               <input type="checkbox" checked={searchPmr} onChange={e => setSearchPmr(e.target.checked)} />
               <span className="slider round blue"></span>
@@ -339,7 +392,7 @@ export default function MapaPageContainer() {
             <div className="res-body">
               <p className="res-row">
                 <i className="fa-solid fa-user-tie" style={{ color: '#64748b', width: '16px' }}></i>
-                <span style={{ color: '#cbd5e1' }}>{state.selectedSpot.arrendador || 'Red P2P'}</span>
+                <span style={{ color: '#cbd5e1' }}>{state.selectedSpot.arrendador || 'Estacionamiento compartido'}</span>
               </p>
               <p className="res-row">
                 <i className="fa-solid fa-car" style={{ color: isFull ? '#ef4444' : '#10b981', width: '16px' }}></i>
@@ -364,7 +417,7 @@ export default function MapaPageContainer() {
               )}
               {state.selectedSpot.es_pmr && (
                 <div className="pmr-badge-strict" style={{ marginTop: '8px' }}>
-                  <i className="fa-solid fa-wheelchair"></i> Accesibilidad PMR Habilitada
+                  <i className="fa-solid fa-wheelchair"></i> Accesible para personas con movilidad reducida
                 </div>
               )}
 
@@ -671,6 +724,7 @@ export default function MapaPageContainer() {
         }
         .search-input:focus { border-color: rgba(59,130,246,0.5); }
         .search-input::placeholder { color: #64748b; }
+        .search-input option { background: #1e293b; color: white; }
 
         @media (max-width: 600px) {
           .radar-overlay { width: calc(100% - 48px); }
