@@ -121,7 +121,7 @@ const STEP = { SELECT: 1, CONFIRM: 2, PAYMENT: 3, PROCESSING: 4, SUCCESS: 5 };
 
 const SPOT_STYLE = {
   available: { bg: '#10b981', label: 'Disponible',  selectable: true  },
-  pmr:       { bg: '#3b82f6', label: 'PMR',          selectable: true  },
+  pmr:       { bg: '#3b82f6', label: 'Accesible',    selectable: true  },
   occupied:  { bg: '#ef4444', label: 'Ocupada',      selectable: false },
   reserved:  { bg: '#f59e0b', label: 'Reservada',    selectable: false },
 };
