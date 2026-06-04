@@ -1,12 +1,13 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@parkings/supabase-db';
 import { toast } from 'react-hot-toast';
 import { api } from '../../src/lib/api';
 import ReviewModal from '../../src/components/ReviewModal';
 
 export default function ProfilePage() {
+  const searchParams = useSearchParams();
   const [session, setSession] = useState(null);
   const [perfil, setPerfil] = useState({ nombre: '', telefono: '', requiere_pmr: false, avatar_url: '' });
   const [vehiculos, setVehiculos] = useState([]);
@@ -14,7 +15,7 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [nuevoEmail, setNuevoEmail] = useState('');
-  const [activeTab, setActiveTab] = useState('personales'); // personales, vehiculos, pmr
+  const [activeTab, setActiveTab] = useState(searchParams?.get('tab') || 'personales'); // personales, vehiculos, pmr
   
   const [nuevoVehiculo, setNuevoVehiculo] = useState({ patente: '', marca: '', modelo: '', color: '' });
 
@@ -469,33 +470,47 @@ export default function ProfilePage() {
                   {favoritos.map(f => {
                     const est = f.estacionamiento || {};
                     const id = est.id ?? f.estacionamiento_id;
+                    const libres = est.total_spots != null ? Math.max((est.total_spots || 0) - (est.occupied_spots || 0), 0) : null;
                     return (
-                      <div key={f.id} className="vehicle-card" style={{ justifyContent: 'space-between' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                          <div className="v-icon" style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b' }}>
-                            <i className="fa-solid fa-star"></i>
+                      <div key={f.id} className="fav-card">
+                        {est.photos && est.photos.length > 0 ? (
+                          <img src={est.photos[0]} alt={est.nombre} className="fav-thumb" />
+                        ) : (
+                          <div className="fav-icon-box">
+                            <i className="fa-solid fa-square-parking"></i>
                           </div>
-                          <div className="v-details" style={{ marginLeft: 0 }}>
-                            <strong>{est.nombre || 'Estacionamiento'}</strong>
-                            <span>
-                              {est.comuna ? `${est.comuna} · ` : ''}
-                              {est.precio_hora != null ? (est.precio_hora === 0 ? 'Gratuito' : `$${Number(est.precio_hora).toLocaleString('es-CL')}/hr`) : ''}
-                              {est.es_pmr ? ' · ♿ Accesible' : ''}
+                        )}
+                        <div className="fav-info">
+                          <span className="fav-name">{est.nombre || 'Estacionamiento'}</span>
+                          <span className="fav-meta">
+                            {est.comuna ? `${est.comuna} · ` : ''}
+                            {est.precio_hora != null ? (est.precio_hora === 0 ? 'Gratuito' : `$${Number(est.precio_hora).toLocaleString('es-CL')}/hr`) : ''}
+                            {est.es_pmr ? ' · ♿' : ''}
+                            {libres != null ? ` · ${libres > 0 ? `${libres} libre${libres > 1 ? 's' : ''}` : 'Sin cupos'}` : ''}
+                          </span>
+                          {est.rating > 0 && (
+                            <span className="fav-rating">
+                              {'★'.repeat(Math.round(est.rating))}{'☆'.repeat(5 - Math.round(est.rating))} {est.rating}
                             </span>
-                            {est.rating > 0 && (
-                              <span style={{ color: '#f59e0b', fontSize: '0.8rem' }}>
-                                {'★'.repeat(Math.round(est.rating))}{'☆'.repeat(5 - Math.round(est.rating))} {est.rating}
-                              </span>
-                            )}
-                          </div>
+                          )}
                         </div>
-                        <button
-                          onClick={() => handleQuitarFavorito(id)}
-                          className="btn-icon-danger"
-                          title="Quitar de favoritos"
-                        >
-                          <i className="fa-solid fa-star-slash"></i>
-                        </button>
+                        <div className="fav-actions">
+                          {est.lat && est.lng && (
+                            <a href={`/mapa?lat=${est.lat}&lng=${est.lng}&id=${id}`} className="fav-btn fav-btn-map" title="Ir al mapa">
+                              <i className="fa-solid fa-map-pin"></i> Ir al mapa
+                            </a>
+                          )}
+                          <a href={`/mapa?id=${id}&reservar=1`} className="fav-btn fav-btn-book" title="Reservar">
+                            <i className="fa-solid fa-calendar-plus"></i> Reservar
+                          </a>
+                          <button
+                            onClick={() => handleQuitarFavorito(id)}
+                            className="fav-btn fav-btn-del"
+                            title="Quitar de favoritos"
+                          >
+                            <i className="fa-solid fa-star-slash"></i>
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
@@ -628,6 +643,25 @@ export default function ProfilePage() {
         .estado-activa { background: rgba(16, 185, 129, 0.15); color: #10b981; }
         .estado-completada { background: rgba(148, 163, 184, 0.15); color: #94a3b8; }
         .estado-cancelada { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+
+        /* Favoritos enhanced cards */
+        .fav-card { display: flex; align-items: center; gap: 16px; padding: 18px 20px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; transition: 0.3s; }
+        .fav-card:hover { border-color: rgba(245,158,11,0.3); background: rgba(245,158,11,0.04); }
+        .fav-thumb { width: 64px; height: 64px; border-radius: 12px; object-fit: cover; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.08); }
+        .fav-icon-box { width: 64px; height: 64px; border-radius: 12px; background: rgba(245,158,11,0.1); color: #f59e0b; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; flex-shrink: 0; }
+        .fav-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+        .fav-name { color: #f8fafc; font-weight: 800; font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .fav-meta { color: #94a3b8; font-size: 0.82rem; }
+        .fav-rating { color: #f59e0b; font-size: 0.78rem; }
+        .fav-actions { display: flex; gap: 8px; flex-shrink: 0; }
+        .fav-btn { display: flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 10px; font-size: 0.8rem; font-weight: 700; border: none; cursor: pointer; transition: 0.2s; text-decoration: none; white-space: nowrap; }
+        .fav-btn-map { background: rgba(59,130,246,0.12); color: #60a5fa; border: 1px solid rgba(59,130,246,0.25); }
+        .fav-btn-map:hover { background: rgba(59,130,246,0.22); }
+        .fav-btn-book { background: rgba(16,185,129,0.12); color: #10b981; border: 1px solid rgba(16,185,129,0.25); }
+        .fav-btn-book:hover { background: rgba(16,185,129,0.22); }
+        .fav-btn-del { background: transparent; color: #ef4444; border: 1px solid rgba(239,68,68,0.2); padding: 8px 10px; }
+        .fav-btn-del:hover { background: rgba(239,68,68,0.1); }
+        @media (max-width: 600px) { .fav-actions { flex-direction: column; } .fav-btn { font-size: 0.72rem; padding: 6px 10px; } }
 
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }

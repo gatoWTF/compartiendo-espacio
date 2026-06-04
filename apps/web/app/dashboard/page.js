@@ -50,9 +50,32 @@ export default function DashboardPage() {
   const [toast, setToast] = useState(null);
   const [reservasRecibidas, setReservasRecibidas] = useState([]);
 
+  // Photo upload
+  const [photos, setPhotos] = useState([]);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 4000);
+  };
+
+  const handlePhotoUpload = async (files) => {
+    if (!session?.user?.id) return;
+    setUploadingPhotos(true);
+    const uploaded = [];
+    for (const file of Array.from(files)) {
+      try {
+        const path = `${session.user.id}/${Date.now()}-${file.name}`;
+        const { error } = await supabase.storage.from('parking-photos').upload(path, file, { upsert: false });
+        if (error) { showToast(`Error subiendo ${file.name}: ${error.message}`, 'error'); continue; }
+        const { data: { publicUrl } } = supabase.storage.from('parking-photos').getPublicUrl(path);
+        uploaded.push(publicUrl);
+      } catch (err) {
+        showToast(`Error: ${err.message}`, 'error');
+      }
+    }
+    setPhotos(prev => [...prev, ...uploaded]);
+    setUploadingPhotos(false);
   };
 
   useEffect(() => {
@@ -206,6 +229,7 @@ export default function DashboardPage() {
         pricePerMinute:     pricePerMinute ? parseFloat(pricePerMinute) : undefined,
         pricePerDay:        pricePerDay    ? parseFloat(pricePerDay)    : undefined,
         allowedVehicleTypes: allowedVehicleTypes.length > 0 ? allowedVehicleTypes : ['car'],
+        photos: photos.length > 0 ? photos : undefined,
       });
 
       if (result.success && result.data) {
@@ -213,6 +237,7 @@ export default function DashboardPage() {
         setNombre(''); setDireccion(''); setComuna(''); setLat(''); setLng(''); setTotalSpots(1); setEsPmr(false);
         setPrecioHora(''); setPricePerMinute(''); setPricePerDay('');
         setAllowedVehicleTypes(['car']);
+        setPhotos([]);
         showToast('¡Estacionamiento publicado con éxito!', 'success');
       }
     } catch (err) {
