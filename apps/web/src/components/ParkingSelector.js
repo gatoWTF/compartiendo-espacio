@@ -63,6 +63,15 @@ const SPOT_STYLE = {
   reserved:  { bg: '#f59e0b', label: 'Reservada',    selectable: false },
 };
 
+// Static (non-conditional) styles for spot buttons — defined once at module scope
+// to avoid recreating this object on every render inside the spots map loop.
+const SPOT_BTN_BASE = {
+  width: '44px', height: '38px', borderRadius: '8px',
+  fontSize: '0.68rem', fontWeight: 800,
+  transition: 'all 0.15s',
+  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '2px',
+};
+
 // ── Stepper control ──
 function Stepper({ value, onChange, min = 0, max, step = 1, label, unit }) {
   return (
@@ -320,17 +329,14 @@ export default function ParkingSelector({ parking, onClose, onReserve, isReservi
                             aria-label={`Plaza ${spot.label} — ${isSelected ? 'Seleccionada' : cfg.label}`}
                             title={`Plaza ${spot.label} — ${cfg.label}`}
                             style={{
-                              width: '44px', height: '38px', borderRadius: '8px',
+                              ...SPOT_BTN_BASE,
                               background: isSelected ? '#f59e0b' : `${cfg.bg}22`,
                               border: `2px solid ${isSelected ? '#f59e0b' : cfg.bg}`,
                               color: isSelected ? '#000' : cfg.bg,
-                              fontSize: '0.68rem', fontWeight: 800,
                               cursor: cfg.selectable ? 'pointer' : 'not-allowed',
                               opacity: cfg.selectable ? 1 : 0.4,
-                              transition: 'all 0.15s',
                               transform: isSelected ? 'scale(1.12)' : 'scale(1)',
                               boxShadow: isSelected ? '0 0 14px #f59e0b99' : 'none',
-                              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '2px',
                             }}
                           >
                             {isLocking

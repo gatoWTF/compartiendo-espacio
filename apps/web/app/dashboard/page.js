@@ -111,7 +111,7 @@ export default function DashboardPage() {
         const result = await api.mapas.getMisEstacionamientos(userObj.id);
         if (result.success) setMyParkings(result.data || []);
       } catch (e) {
-        console.error('Error cargando estacionamientos:', e);
+        if (process.env.NODE_ENV === 'development') console.error('Error cargando estacionamientos:', e);
       }
 
       if (userObj.rol === 'arrendador') {
