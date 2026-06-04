@@ -13,6 +13,10 @@ const ESTADOS = {
   cancelada:  { label: 'Cancelada',  color: '#ef4444' },
 };
 
+// Base style shared by all reservation action buttons; color trio varies per action.
+const ACTION_BTN_BASE = { padding: '8px 14px', borderRadius: '10px', fontWeight: 700, cursor: 'pointer', fontSize: '0.82rem' };
+const actionBtn = (background, border, color) => ({ ...ACTION_BTN_BASE, background, border: `1px solid ${border}`, color });
+
 function fmtFecha(iso) {
   if (!iso) return '—';
   return new Date(iso).toLocaleString('es-CL', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -197,7 +201,7 @@ export default function ReservasPage() {
                   {r.estado !== 'cancelada' && (
                     <button
                       onClick={() => setTicketReserva(r)}
-                      style={{ padding: '8px 14px', background: 'rgba(148,163,184,0.1)', border: '1px solid rgba(148,163,184,0.3)', color: '#cbd5e1', borderRadius: '10px', fontWeight: 700, cursor: 'pointer', fontSize: '0.82rem' }}
+                      style={actionBtn('rgba(148,163,184,0.1)', 'rgba(148,163,184,0.3)', '#cbd5e1')}
                       aria-label="Ver comprobante con código QR"
                     >
                       <i className="fa-solid fa-qrcode"></i> Comprobante
@@ -207,7 +211,7 @@ export default function ReservasPage() {
                     <button
                       onClick={() => doAction('confirmar', r.id)}
                       disabled={isLoading}
-                      style={{ padding: '8px 14px', background: 'rgba(16,185,129,0.15)', border: '1px solid #10b981', color: '#10b981', borderRadius: '10px', fontWeight: 700, cursor: 'pointer', fontSize: '0.82rem' }}
+                      style={actionBtn('rgba(16,185,129,0.15)', '#10b981', '#10b981')}
                       aria-label="Confirmar reserva"
                     >
                       <i className="fa-solid fa-check"></i> Confirmar
@@ -217,7 +221,7 @@ export default function ReservasPage() {
                     <button
                       onClick={() => doAction('completar', r.id)}
                       disabled={isLoading}
-                      style={{ padding: '8px 14px', background: 'rgba(59,130,246,0.15)', border: '1px solid #3b82f6', color: '#3b82f6', borderRadius: '10px', fontWeight: 700, cursor: 'pointer', fontSize: '0.82rem' }}
+                      style={actionBtn('rgba(59,130,246,0.15)', '#3b82f6', '#3b82f6')}
                       aria-label="Marcar como completada"
                     >
                       <i className="fa-solid fa-flag-checkered"></i> Completar
@@ -227,7 +231,7 @@ export default function ReservasPage() {
                     <button
                       onClick={() => doAction('cancelar', r.id)}
                       disabled={isLoading}
-                      style={{ padding: '8px 14px', background: 'rgba(239,68,68,0.1)', border: '1px solid #ef4444', color: '#ef4444', borderRadius: '10px', fontWeight: 700, cursor: 'pointer', fontSize: '0.82rem' }}
+                      style={actionBtn('rgba(239,68,68,0.1)', '#ef4444', '#ef4444')}
                       aria-label="Cancelar reserva"
                     >
                       {isLoading ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-ban"></i>} Cancelar
@@ -236,7 +240,7 @@ export default function ReservasPage() {
                   {tab === 'conductor' && r.estado === 'completada' && !r.calificacion && (
                     <button
                       onClick={() => setRatingModal({ reservaId: r.id })}
-                      style={{ padding: '8px 14px', background: 'rgba(245,158,11,0.1)', border: '1px solid #f59e0b', color: '#f59e0b', borderRadius: '10px', fontWeight: 700, cursor: 'pointer', fontSize: '0.82rem' }}
+                      style={actionBtn('rgba(245,158,11,0.1)', '#f59e0b', '#f59e0b')}
                       aria-label="Calificar reserva"
                     >
                       <i className="fa-solid fa-star"></i> Calificar
