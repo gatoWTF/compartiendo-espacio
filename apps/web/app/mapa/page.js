@@ -47,6 +47,21 @@ export default function MapaPageContainer() {
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [authToken, setAuthToken] = useState(null);
 
+  // ── Lightbox de fotos (galería ampliada) ──
+  const [lightbox, setLightbox] = useState(null); // { photos: [], index: 0 }
+
+  // Teclado para el lightbox: Esc cierra, flechas navegan
+  useEffect(() => {
+    if (!lightbox) return;
+    const onKey = (e) => {
+      if (e.key === 'Escape') setLightbox(null);
+      else if (e.key === 'ArrowLeft') setLightbox(lb => lb && ({ ...lb, index: (lb.index - 1 + lb.photos.length) % lb.photos.length }));
+      else if (e.key === 'ArrowRight') setLightbox(lb => lb && ({ ...lb, index: (lb.index + 1) % lb.photos.length }));
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [lightbox]);
+
   // ── Favoritos ──
   const [favIds, setFavIds] = useState(new Set());
   const [favLoading, setFavLoading] = useState(false);
@@ -389,7 +404,16 @@ export default function MapaPageContainer() {
               {state.selectedSpot.photos && state.selectedSpot.photos.length > 0 && (
                 <div className="spot-photos">
                   {state.selectedSpot.photos.map((url, i) => (
-                    <img key={i} src={url} alt={`Foto ${i+1}`} className="spot-photo" />
+                    <button
+                      key={i}
+                      type="button"
+                      className="spot-photo-btn"
+                      onClick={() => setLightbox({ photos: state.selectedSpot.photos, index: i })}
+                      aria-label={`Ampliar foto ${i + 1}`}
+                    >
+                      <img src={url} alt={`Foto ${i+1}`} className="spot-photo" loading="lazy" />
+                      <span className="spot-photo-zoom"><i className="fa-solid fa-magnifying-glass-plus"></i></span>
+                    </button>
                   ))}
                 </div>
               )}
@@ -524,6 +548,48 @@ export default function MapaPageContainer() {
             actions.setSelectedSpot(null);
           }}
         />
+      )}
+
+      {/* ── Lightbox: galería de fotos ampliada ── */}
+      {lightbox && (
+        <div className="lightbox-overlay" onClick={() => setLightbox(null)}>
+          <button className="lightbox-close" onClick={() => setLightbox(null)} aria-label="Cerrar">
+            <i className="fa-solid fa-xmark"></i>
+          </button>
+
+          {lightbox.photos.length > 1 && (
+            <button
+              className="lightbox-nav prev"
+              onClick={(e) => { e.stopPropagation(); setLightbox(lb => ({ ...lb, index: (lb.index - 1 + lb.photos.length) % lb.photos.length })); }}
+              aria-label="Foto anterior"
+            >
+              <i className="fa-solid fa-chevron-left"></i>
+            </button>
+          )}
+
+          <img
+            src={lightbox.photos[lightbox.index]}
+            alt={`Foto ampliada ${lightbox.index + 1}`}
+            className="lightbox-img"
+            onClick={(e) => e.stopPropagation()}
+          />
+
+          {lightbox.photos.length > 1 && (
+            <button
+              className="lightbox-nav next"
+              onClick={(e) => { e.stopPropagation(); setLightbox(lb => ({ ...lb, index: (lb.index + 1) % lb.photos.length })); }}
+              aria-label="Foto siguiente"
+            >
+              <i className="fa-solid fa-chevron-right"></i>
+            </button>
+          )}
+
+          {lightbox.photos.length > 1 && (
+            <div className="lightbox-counter" onClick={(e) => e.stopPropagation()}>
+              {lightbox.index + 1} / {lightbox.photos.length}
+            </div>
+          )}
+        </div>
       )}
 
       <style jsx>{`
@@ -791,7 +857,30 @@ export default function MapaPageContainer() {
         .res-row { margin: 0 0 12px 0; font-size: 0.9rem; color: #cbd5e1; display: flex; align-items: center; gap: 12px; }
         .res-row i { color: #64748b; width: 16px; text-align: center; }
         .spot-photos { display: flex; gap: 8px; overflow-x: auto; margin-bottom: 14px; padding-bottom: 4px; }
-        .spot-photo { width: 100px; height: 70px; object-fit: cover; border-radius: 10px; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.1); }
+        .spot-photo-btn { position: relative; padding: 0; border: none; background: none; cursor: pointer; flex-shrink: 0; border-radius: 10px; overflow: hidden; line-height: 0; }
+        .spot-photo { width: 100px; height: 70px; object-fit: cover; border-radius: 10px; display: block; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.3s ease; }
+        .spot-photo-btn:hover .spot-photo { transform: scale(1.08); }
+        .spot-photo-zoom { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: white; font-size: 1.1rem; background: rgba(2,6,23,0.45); opacity: 0; transition: opacity 0.25s; border-radius: 10px; }
+        .spot-photo-btn:hover .spot-photo-zoom { opacity: 1; }
+
+        /* === LIGHTBOX === */
+        .lightbox-overlay { position: fixed; inset: 0; z-index: 5000; background: rgba(2,6,23,0.92); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; padding: 40px; animation: lbFade 0.25s ease; cursor: zoom-out; }
+        .lightbox-img { max-width: min(92vw, 1100px); max-height: 85vh; object-fit: contain; border-radius: 14px; box-shadow: 0 25px 60px rgba(0,0,0,0.7); cursor: default; animation: lbZoom 0.3s cubic-bezier(0.175,0.885,0.32,1.275); }
+        .lightbox-close { position: absolute; top: 24px; right: 28px; width: 46px; height: 46px; border-radius: 50%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: white; font-size: 1.3rem; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
+        .lightbox-close:hover { background: rgba(239,68,68,0.8); transform: rotate(90deg); }
+        .lightbox-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 52px; height: 52px; border-radius: 50%; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: white; font-size: 1.2rem; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
+        .lightbox-nav:hover { background: rgba(59,130,246,0.7); }
+        .lightbox-nav.prev { left: 28px; }
+        .lightbox-nav.next { right: 28px; }
+        .lightbox-counter { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #e2e8f0; padding: 6px 16px; border-radius: 99px; font-size: 0.85rem; font-weight: 700; letter-spacing: 0.5px; }
+        @keyframes lbFade { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes lbZoom { from { transform: scale(0.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @media (max-width: 600px) {
+          .lightbox-overlay { padding: 16px; }
+          .lightbox-nav { width: 42px; height: 42px; }
+          .lightbox-nav.prev { left: 12px; }
+          .lightbox-nav.next { right: 12px; }
+        }
         
         .pmr-badge-strict {
           display: inline-flex; align-items: center; justify-content: center; gap: 8px;
