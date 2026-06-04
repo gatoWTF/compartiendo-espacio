@@ -421,7 +421,31 @@ export default function MapaPageContainer() {
                 </div>
               )}
 
+              {/* Barra de ocupacion */}
+              {(() => {
+                const pct = Math.round((occupiedSpots / totalSpots) * 100);
+                const barColor = pct >= 90 ? '#ef4444' : pct >= 60 ? '#f59e0b' : '#10b981';
+                return (
+                  <div style={{ margin: '10px 0 4px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#64748b', marginBottom: '5px' }}>
+                      <span>Ocupacion</span><span style={{ color: barColor, fontWeight: 700 }}>{pct}%</span>
+                    </div>
+                    <div style={{ height: '5px', borderRadius: '3px', background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${pct}%`, background: barColor, borderRadius: '3px', transition: 'width 0.6s ease', boxShadow: `0 0 6px ${barColor}` }}></div>
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${state.selectedSpot.lat},${state.selectedSpot.lng}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '100%', padding: '9px', marginBottom: '8px', borderRadius: '10px', border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.08)', color: '#60a5fa', fontSize: '0.85rem', fontWeight: 600, textDecoration: 'none', boxSizing: 'border-box', transition: 'background 0.2s' }}
+                >
+                  <i className="fa-solid fa-diamond-turn-right"></i> Como llegar
+                </a>
                 {state.reserveError && (
                   <div style={{ color: '#f87171', fontSize: '0.82rem', padding: '8px 12px', background: 'rgba(239,68,68,0.08)', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.2)', marginBottom: '10px', textAlign: 'center' }}>
                     {state.reserveError}
