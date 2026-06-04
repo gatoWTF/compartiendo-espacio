@@ -1,4 +1,5 @@
 'use client';
+import { Suspense } from 'react';
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
@@ -21,7 +22,7 @@ const registerSchema = z.object({
   rol: z.enum(['cliente', 'arrendador'], { required_error: "Debes seleccionar un rol" })
 });
 
-export default function AuthPage() {
+function AuthForm() {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [successAnim, setSuccessAnim] = useState(false);
@@ -265,5 +266,13 @@ export default function AuthPage() {
         }
       `}</style>
     </div>
+  );
+}
+
+export default function AuthPage() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: '100vh', background: '#020617' }} />}>
+      <AuthForm />
+    </Suspense>
   );
 }
