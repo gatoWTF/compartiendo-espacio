@@ -1,5 +1,6 @@
 import './globals.css';
 import Navbar from '../src/components/Navbar';
+import PWAInstallPrompt from '../src/components/PWAInstallPrompt';
 import { Toaster } from 'react-hot-toast';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://parkings-web.vercel.app';
@@ -58,6 +59,7 @@ export default function RootLayout({ children }) {
         <Toaster position="top-right" toastOptions={{ style: { background: '#1e293b', color: '#f8fafc', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px' }, success: { iconTheme: { primary: '#10b981', secondary: '#fff' } }, error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } } }} />
         <Navbar />
         {children}
+        <PWAInstallPrompt />
       </body>
     </html>
   );

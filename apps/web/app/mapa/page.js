@@ -438,14 +438,32 @@ export default function MapaPageContainer() {
               })()}
 
               <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                <a
-                  href={`https://www.google.com/maps/dir/?api=1&destination=${state.selectedSpot.lat},${state.selectedSpot.lng}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '100%', padding: '9px', marginBottom: '8px', borderRadius: '10px', border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.08)', color: '#60a5fa', fontSize: '0.85rem', fontWeight: 600, textDecoration: 'none', boxSizing: 'border-box', transition: 'background 0.2s' }}
-                >
-                  <i className="fa-solid fa-diamond-turn-right"></i> Como llegar
-                </a>
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${state.selectedSpot.lat},${state.selectedSpot.lng}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '9px', borderRadius: '10px', border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.08)', color: '#60a5fa', fontSize: '0.85rem', fontWeight: 600, textDecoration: 'none', boxSizing: 'border-box', transition: 'background 0.2s' }}
+                  >
+                    <i className="fa-solid fa-diamond-turn-right"></i> Como llegar
+                  </a>
+                  <button
+                    onClick={async () => {
+                      const sp = state.selectedSpot;
+                      const url = `https://www.google.com/maps/search/?api=1&query=${sp.lat},${sp.lng}`;
+                      const texto = `${sp.nombre}${sp.comuna ? ' · ' + sp.comuna : ''}${sp.precio_hora ? ' · $' + sp.precio_hora.toLocaleString() + '/hr' : ''}`;
+                      try {
+                        if (navigator.share) await navigator.share({ title: sp.nombre, text: texto, url });
+                        else { await navigator.clipboard.writeText(`${texto}\n${url}`); alert('Enlace copiado al portapapeles'); }
+                      } catch { /* cancelado */ }
+                    }}
+                    aria-label="Compartir esta plaza"
+                    title="Compartir"
+                    style={{ flexShrink: 0, width: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: '#94a3b8', fontSize: '0.9rem', cursor: 'pointer', transition: 'all 0.2s' }}
+                  >
+                    <i className="fa-solid fa-share-nodes"></i>
+                  </button>
+                </div>
                 {state.reserveError && (
                   <div style={{ color: '#f87171', fontSize: '0.82rem', padding: '8px 12px', background: 'rgba(239,68,68,0.08)', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.2)', marginBottom: '10px', textAlign: 'center' }}>
                     {state.reserveError}

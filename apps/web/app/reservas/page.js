@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@parkings/supabase-db';
 import { toast } from 'react-hot-toast';
 import ReviewModal from '../../src/components/ReviewModal';
+import ReservaTicket from '../../src/components/ReservaTicket';
 
 const ESTADOS = {
   pendiente:  { label: 'Pendiente',  color: '#f59e0b' },
@@ -26,6 +27,7 @@ export default function ReservasPage() {
   const [reservasArr, setReservasArr] = useState([]);
   const [actionLoading, setActionLoading] = useState(null);
   const [ratingModal, setRatingModal] = useState(null); // { reservaId }
+  const [ticketReserva, setTicketReserva] = useState(null); // reserva para el comprobante
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
@@ -192,6 +194,15 @@ export default function ReservasPage() {
                 </div>
 
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  {r.estado !== 'cancelada' && (
+                    <button
+                      onClick={() => setTicketReserva(r)}
+                      style={{ padding: '8px 14px', background: 'rgba(148,163,184,0.1)', border: '1px solid rgba(148,163,184,0.3)', color: '#cbd5e1', borderRadius: '10px', fontWeight: 700, cursor: 'pointer', fontSize: '0.82rem' }}
+                      aria-label="Ver comprobante con código QR"
+                    >
+                      <i className="fa-solid fa-qrcode"></i> Comprobante
+                    </button>
+                  )}
                   {tab === 'arrendador' && r.estado === 'pendiente' && (
                     <button
                       onClick={() => doAction('confirmar', r.id)}
@@ -244,6 +255,10 @@ export default function ReservasPage() {
           onClose={() => setRatingModal(null)}
           onSubmit={handleSubmitReview}
         />
+      )}
+
+      {ticketReserva && (
+        <ReservaTicket reserva={ticketReserva} onClose={() => setTicketReserva(null)} />
       )}
     </section>
   );
