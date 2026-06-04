@@ -159,11 +159,11 @@ export const api = {
         body: JSON.stringify({ action: 'completar', reserva_id }),
       }),
 
-    calificar: async (reserva_id, calificacion, comentario) =>
+    calificar: async (reserva_id, calificacion, comentario, photoUrl) =>
       fetchWithTimeout(`${RESERVAS_URL}/manage`, {
         method: 'PATCH',
         headers: await authHeaders(),
-        body: JSON.stringify({ action: 'calificar', reserva_id, calificacion, comentario }),
+        body: JSON.stringify({ action: 'calificar', reserva_id, calificacion, comentario, ...(photoUrl ? { review_photo_url: photoUrl } : {}) }),
       }),
   },
   favoritos: {

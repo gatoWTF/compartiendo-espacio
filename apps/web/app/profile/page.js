@@ -59,8 +59,8 @@ export default function ProfilePage() {
 
   const [reviewModal, setReviewModal] = useState(null); // { reservaId }
 
-  const handleSubmitReview = async ({ reservaId, stars, comentario }) => {
-    const res = await api.reservas.calificar(reservaId, stars, comentario);
+  const handleSubmitReview = async ({ reservaId, stars, comentario, photoUrl }) => {
+    const res = await api.reservas.calificar(reservaId, stars, comentario, photoUrl);
     if (!res.success) throw new Error(res.error || 'No se pudo calificar');
     cargarReservas();
   };
@@ -435,6 +435,9 @@ export default function ProfilePage() {
                         </span>
                       </div>
                       <div className="reserva-actions">
+                        {r.review_photo_url && (
+                          <img src={r.review_photo_url} alt="foto reseña" style={{width:'48px',height:'48px',objectFit:'cover',borderRadius:'8px',border:'1px solid rgba(255,255,255,0.08)'}} />
+                        )}
                         {(r.estado === 'pendiente' || r.estado === 'confirmada') && (
                           <button onClick={() => handleCancelarReserva(r.id)} className="btn-icon-danger" title="Cancelar">
                             <i className="fa-solid fa-ban"></i>

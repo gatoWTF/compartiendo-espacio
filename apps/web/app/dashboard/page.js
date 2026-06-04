@@ -24,6 +24,7 @@ export default function DashboardPage() {
 
   const [nombre, setNombre] = useState('');
   const [direccion, setDireccion] = useState('');
+  const [descripcion, setDescripcion] = useState('');
   const [comuna, setComuna] = useState('');
   const [lat, setLat] = useState('');
   const [lng, setLng] = useState('');
@@ -225,6 +226,8 @@ export default function DashboardPage() {
         esPmr,
         userId: session.user.id,
         comuna:             comuna || undefined,
+        descripcion:        descripcion || undefined,
+        direccion:          direccion || undefined,
         precioHora:         precioHora     ? parseFloat(precioHora)     : undefined,
         pricePerMinute:     pricePerMinute ? parseFloat(pricePerMinute) : undefined,
         pricePerDay:        pricePerDay    ? parseFloat(pricePerDay)    : undefined,
@@ -281,6 +284,8 @@ export default function DashboardPage() {
   // ── Edit modal ──
   const [editingParking,   setEditingParking]   = useState(null);
   const [editNombre,       setEditNombre]       = useState('');
+  const [editDescripcion,  setEditDescripcion]  = useState('');
+  const [editDireccion,    setEditDireccion]    = useState('');
   const [editTotalSpots,   setEditTotalSpots]   = useState(1);
   const [editEsPmr,        setEditEsPmr]        = useState(false);
   const [editPrecioHora,   setEditPrecioHora]   = useState('');
@@ -297,6 +302,8 @@ export default function DashboardPage() {
   const openEdit = (parking) => {
     setEditingParking(parking);
     setEditNombre(parking.nombre || '');
+    setEditDescripcion(parking.descripcion || '');
+    setEditDireccion(parking.direccion || '');
     setEditTotalSpots(parking.total_spots || 1);
     setEditEsPmr(parking.es_pmr || false);
     setEditPrecioHora(parking.precio_hora != null ? String(parking.precio_hora) : '');
@@ -311,6 +318,8 @@ export default function DashboardPage() {
     try {
       const res = await api.mapas.actualizarEstacionamiento(editingParking.id, {
         nombre:              editNombre,
+        descripcion:         editDescripcion || null,
+        direccion:           editDireccion || null,
         totalSpots:          editTotalSpots,
         esPmr:               editEsPmr,
         precioHora:          editPrecioHora,
