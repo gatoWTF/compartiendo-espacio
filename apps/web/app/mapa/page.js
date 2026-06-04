@@ -717,12 +717,14 @@ export default function MapaPageContainer() {
           right: 24px;
           width: 320px;
           max-width: calc(100vw - 48px);
-          /* Limit to viewport height so the button is never clipped */
-          max-height: calc(100vh - 130px);
+          max-height: calc(100vh - 160px);
           overflow-y: auto;
           z-index: 1000;
-          transform: translateX(120%);
-          transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+          animation: panelSlideIn 0.38s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+        }
+        @keyframes panelSlideIn {
+          from { opacity: 0; transform: translateX(110%) scale(0.96); }
+          to   { opacity: 1; transform: translateX(0)   scale(1);    }
         }
         .reservation-panel.slide-in { transform: translateX(0); }
         .res-header {
@@ -790,6 +792,20 @@ export default function MapaPageContainer() {
           .radar-overlay { width: calc(100% - 48px); }
           .btn-gps-strict { position: absolute; right: 0; top: 0; }
           .search-panel { left: 24px; top: auto; bottom: 24px; width: calc(100% - 48px); }
+          .reservation-panel {
+            bottom: 0;
+            right: 0;
+            left: 0;
+            width: 100%;
+            max-width: 100%;
+            max-height: 70vh;
+            border-radius: 20px 20px 0 0;
+            animation: panelSlideUp 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+          }
+          @keyframes panelSlideUp {
+            from { opacity: 0; transform: translateY(100%); }
+            to   { opacity: 1; transform: translateY(0);    }
+          }
         }
       `}</style>
     </div>
