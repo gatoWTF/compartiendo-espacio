@@ -13,13 +13,18 @@ export default function MapaPageContainer() {
   const { state, actions } = useMapRadar();
   const [filters, setFilters] = useState({ p2p: false, pmr: false, vehicle: null });
   const [localRadius, setLocalRadius] = useState(state.radius);
+  const [panelCollapsed, setPanelCollapsed] = useState(false);
+
+  // En pantallas pequeñas el panel arranca contraído para no tapar el mapa.
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth <= 600) setPanelCollapsed(true);
+  }, []);
 
   // ── Búsqueda avanzada ──
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQ, setSearchQ] = useState('');
   const [searchRegion, setSearchRegion] = useState('');
   const [searchComuna, setSearchComuna] = useState('');
-  const [searchPmr, setSearchPmr] = useState(false);
   const [searchDisponible, setSearchDisponible] = useState(false);
   const [searchPrecioMin, setSearchPrecioMin] = useState('');
   const [searchPrecioMax, setSearchPrecioMax] = useState('');
@@ -75,7 +80,6 @@ export default function MapaPageContainer() {
     const filtros = {};
     if (searchQ)        filtros.q         = searchQ;
     if (searchComuna)   filtros.comuna    = searchComuna;
-    if (searchPmr)      filtros.pmr       = 'true';
     if (searchDisponible) filtros.disponible = 'true';
     if (searchPrecioMin) filtros.precioMin = searchPrecioMin;
     if (searchPrecioMax) filtros.precioMax = searchPrecioMax;
@@ -111,13 +115,27 @@ export default function MapaPageContainer() {
   return (
     <div className="map-page-wrapper">
 
-      {/* ── PANEL DE RADAR (Top Left - True Glassmorphism) ── */}
+      {/* ── PANEL DE CONTROL UNIFICADO (Radar + Filtros, colapsable) ── */}
       <div className="radar-overlay">
-        <div className="glass-panel-strict">
+        <div className={`glass-panel-strict control-panel ${panelCollapsed ? 'is-collapsed' : ''}`}>
           <div className="panel-header">
             <i className="fa-solid fa-satellite-dish pulse-icon text-green-500"></i>
             <span>Radar de Proximidad</span>
+            {panelCollapsed && (
+              <span className="collapsed-hint">{localRadius < 1 ? `${localRadius * 1000} m` : `${localRadius} km`}</span>
+            )}
+            <button
+              className="btn-collapse"
+              onClick={() => setPanelCollapsed(c => !c)}
+              aria-label={panelCollapsed ? 'Expandir panel de control' : 'Contraer panel de control'}
+              aria-expanded={!panelCollapsed}
+            >
+              <i className={`fa-solid fa-chevron-${panelCollapsed ? 'down' : 'up'}`}></i>
+            </button>
           </div>
+
+          {!panelCollapsed && (
+          <div className="panel-content">
 
           {/* Indicador de precisión de ubicación */}
           {state.locationSource && (
@@ -222,116 +240,94 @@ export default function MapaPageContainer() {
               </button>
             )}
           </div>
+
+          <div className="panel-divider"></div>
+
+          {/* Acordeón: Filtros avanzados (nombre, región, comuna, precio) */}
+          <button
+            className="accordion-toggle"
+            onClick={() => setSearchOpen(o => !o)}
+            aria-expanded={searchOpen}
+          >
+            <span><i className="fa-solid fa-sliders" style={{ marginRight: '8px', color: '#60a5fa' }}></i>Filtros avanzados</span>
+            <i className={`fa-solid fa-chevron-${searchOpen ? 'up' : 'down'}`}></i>
+          </button>
+
+          {searchOpen && (
+            <div className="advanced-section">
+              <input
+                className="search-input"
+                placeholder="Nombre del estacionamiento..."
+                value={searchQ}
+                onChange={e => setSearchQ(e.target.value)}
+              />
+              <select
+                className="search-input"
+                value={searchRegion}
+                onChange={e => { setSearchRegion(e.target.value); setSearchComuna(''); }}
+                style={{ marginTop: '8px' }}
+              >
+                <option value="">Todas las regiones</option>
+                {REGIONES.map(r => (
+                  <option key={r.id} value={r.id}>{r.nombre}</option>
+                ))}
+              </select>
+              {comunasDisponibles.length > 0 && (
+                <select
+                  className="search-input"
+                  value={searchComuna}
+                  onChange={e => setSearchComuna(e.target.value)}
+                  style={{ marginTop: '8px' }}
+                >
+                  <option value="">Todas las comunas</option>
+                  {comunasDisponibles.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              )}
+              <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                <input
+                  className="search-input"
+                  placeholder="Precio mín"
+                  type="number"
+                  min="0"
+                  value={searchPrecioMin}
+                  onChange={e => setSearchPrecioMin(e.target.value)}
+                  style={{ flex: 1 }}
+                />
+                <input
+                  className="search-input"
+                  placeholder="Precio máx"
+                  type="number"
+                  min="0"
+                  value={searchPrecioMax}
+                  onChange={e => setSearchPrecioMax(e.target.value)}
+                  style={{ flex: 1 }}
+                />
+              </div>
+              <div style={{ padding: '4px 4px 0', fontSize: '0.68rem', color: '#475569' }}>Precio / hora (CLP)</div>
+              <div className="filter-row" style={{ paddingTop: '8px' }}>
+                <span className="switch-text">Solo disponibles</span>
+                <label className="modern-switch">
+                  <input type="checkbox" checked={searchDisponible} onChange={e => setSearchDisponible(e.target.checked)} />
+                  <span className="slider round"></span>
+                </label>
+              </div>
+              <button className="btn-reserve-strict" style={{ marginTop: '12px' }} onClick={handleBusquedaAvanzada}>
+                <i className="fa-solid fa-magnifying-glass"></i> Buscar
+              </button>
+            </div>
+          )}
+          </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <button className="btn-gps-strict" onClick={handleGPS} aria-label="Centrar en mi ubicación">
             <i className="fa-solid fa-location-crosshairs"></i>
           </button>
-          <button
-            className="btn-gps-strict"
-            onClick={() => setSearchOpen(o => !o)}
-            aria-label="Búsqueda avanzada"
-            style={searchOpen ? { color: 'white', borderColor: 'rgba(59,130,246,0.5)', background: 'rgba(59,130,246,0.2)' } : {}}
-          >
-            <i className="fa-solid fa-magnifying-glass"></i>
-          </button>
         </div>
       </div>
-
-      {/* ── PANEL BÚSQUEDA AVANZADA ── */}
-      {searchOpen && (
-        <div className="glass-panel-strict search-panel">
-          <div className="panel-header" style={{ marginBottom: '14px' }}>
-            <i className="fa-solid fa-sliders text-blue-400"></i>
-            <span>Filtros Avanzados</span>
-            <button className="btn-close-strict" style={{ marginLeft: 'auto' }} onClick={() => setSearchOpen(false)}>
-              <i className="fa-solid fa-xmark"></i>
-            </button>
-          </div>
-
-          <input
-            className="search-input"
-            placeholder="Nombre del estacionamiento..."
-            value={searchQ}
-            onChange={e => setSearchQ(e.target.value)}
-          />
-
-          {/* Selector de Región */}
-          <select
-            className="search-input"
-            value={searchRegion}
-            onChange={e => { setSearchRegion(e.target.value); setSearchComuna(''); }}
-            style={{ marginTop: '8px' }}
-          >
-            <option value="">Todas las regiones</option>
-            {REGIONES.map(r => (
-              <option key={r.id} value={r.id}>{r.nombre}</option>
-            ))}
-          </select>
-
-          {/* Selector de Comuna (depende de región) */}
-          {comunasDisponibles.length > 0 && (
-            <select
-              className="search-input"
-              value={searchComuna}
-              onChange={e => setSearchComuna(e.target.value)}
-              style={{ marginTop: '8px' }}
-            >
-              <option value="">Todas las comunas</option>
-              {comunasDisponibles.map(c => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          )}
-
-          {/* Rango de precio */}
-          <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-            <input
-              className="search-input"
-              placeholder="Precio mín"
-              type="number"
-              min="0"
-              value={searchPrecioMin}
-              onChange={e => setSearchPrecioMin(e.target.value)}
-              style={{ flex: 1 }}
-            />
-            <input
-              className="search-input"
-              placeholder="Precio máx"
-              type="number"
-              min="0"
-              value={searchPrecioMax}
-              onChange={e => setSearchPrecioMax(e.target.value)}
-              style={{ flex: 1 }}
-            />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 4px', fontSize: '0.68rem', color: '#475569' }}>
-            <span>Precio / hora (CLP)</span>
-          </div>
-
-          <div className="panel-divider" style={{ margin: '12px 0' }}></div>
-
-          <div className="filter-row" style={{ paddingTop: 0 }}>
-            <span className="switch-text">Solo disponibles</span>
-            <label className="modern-switch">
-              <input type="checkbox" checked={searchDisponible} onChange={e => setSearchDisponible(e.target.checked)} />
-              <span className="slider round"></span>
-            </label>
-          </div>
-          <div className="filter-row">
-            <span className="switch-text text-blue-400">Acceso movilidad reducida</span>
-            <label className="modern-switch">
-              <input type="checkbox" checked={searchPmr} onChange={e => setSearchPmr(e.target.checked)} />
-              <span className="slider round blue"></span>
-            </label>
-          </div>
-
-          <button className="btn-reserve-strict" style={{ marginTop: '14px' }} onClick={handleBusquedaAvanzada}>
-            <i className="fa-solid fa-magnifying-glass"></i> Buscar
-          </button>
-        </div>
-      )}
 
       {/* ── ÁREA DEL MAPA ── */}
       <div className="map-area" style={{ position: 'relative' }}>
@@ -567,6 +563,57 @@ export default function MapaPageContainer() {
           flex: 1;
           padding: 20px;
         }
+        .control-panel {
+          max-height: calc(100vh - 130px);
+          overflow-y: auto;
+        }
+        .btn-collapse {
+          margin-left: auto;
+          background: transparent;
+          border: none;
+          color: #94a3b8;
+          cursor: pointer;
+          font-size: 0.95rem;
+          padding: 4px 8px;
+          border-radius: 8px;
+          transition: color 0.2s, background 0.2s;
+        }
+        .btn-collapse:hover { color: #fff; background: rgba(255,255,255,0.06); }
+        .collapsed-hint {
+          margin-left: auto;
+          margin-right: 6px;
+          font-size: 0.85rem;
+          font-weight: 800;
+          color: #60a5fa;
+        }
+        .accordion-toggle {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          background: rgba(255,255,255,0.03);
+          border: 1px solid rgba(255,255,255,0.08);
+          border-radius: 10px;
+          color: #cbd5e1;
+          font-size: 0.85rem;
+          font-weight: 600;
+          padding: 11px 14px;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .accordion-toggle:hover {
+          background: rgba(59,130,246,0.1);
+          border-color: rgba(59,130,246,0.3);
+          color: #fff;
+        }
+        .advanced-section {
+          margin-top: 10px;
+          animation: advDown 0.25s ease;
+        }
+        @keyframes advDown {
+          from { opacity: 0; transform: translateY(-6px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
 
         .panel-header {
           display: flex;
@@ -763,15 +810,7 @@ export default function MapaPageContainer() {
         }
         .btn-reserve-strict:hover { background: #1d4ed8; }
 
-        /* Búsqueda avanzada */
-        .search-panel {
-          position: absolute;
-          top: 24px;
-          left: 360px;
-          z-index: 1000;
-          width: 280px;
-          padding: 18px;
-        }
+        /* Inputs de filtros avanzados (dentro del panel de control) */
         .search-input {
           width: 100%;
           padding: 10px 14px;
@@ -789,9 +828,8 @@ export default function MapaPageContainer() {
         .search-input option { background: #1e293b; color: white; }
 
         @media (max-width: 600px) {
-          .radar-overlay { width: calc(100% - 48px); }
-          .btn-gps-strict { position: absolute; right: 0; top: 0; }
-          .search-panel { left: 24px; top: auto; bottom: 24px; width: calc(100% - 48px); }
+          .radar-overlay { top: 16px; left: 16px; width: calc(100% - 32px); gap: 10px; }
+          .control-panel { max-height: 62vh; }
           .reservation-panel {
             bottom: 0;
             right: 0;
