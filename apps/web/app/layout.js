@@ -2,21 +2,40 @@ import './globals.css';
 import Navbar from '../src/components/Navbar';
 import { Toaster } from 'react-hot-toast';
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://parkings-web.vercel.app';
+
 export const metadata = {
-  title: "Parkings Together | Encuentra y Comparte Estacionamientos",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "Parkings Together | Encuentra y Comparte Estacionamientos",
+    template: "%s | Parkings Together",
+  },
   description: "Encuentra estacionamientos cerca de ti y comienza a generar ingresos compartiendo tu plaza disponible.",
+  applicationName: "Parkings Together",
+  keywords: ["estacionamiento", "parking", "Chile", "reserva de estacionamiento", "movilidad reducida", "compartir estacionamiento"],
+  authors: [{ name: "Parkings Together" }],
   icons: { icon: '/favicon.ico' },
+  alternates: { canonical: '/' },
   openGraph: {
     title: "Parkings Together",
     description: "Encuentra estacionamientos cerca de ti o publica tu plaza disponible.",
     type: 'website',
     locale: 'es_CL',
+    siteName: 'Parkings Together',
+    url: SITE_URL,
   },
   twitter: {
     card: 'summary',
     title: "Parkings Together",
     description: "Encuentra estacionamientos cerca de ti o publica tu plaza disponible.",
   },
+};
+
+export const viewport = {
+  themeColor: '#020617',
+  width: 'device-width',
+  initialScale: 1,
+  colorScheme: 'dark',
 };
 
 export default function RootLayout({ children }) {

@@ -1,5 +1,6 @@
 'use client';
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { calcTotal, calcBreakdown } from '../lib/pricing';
 
 const PAY_METHODS = [
   { id: 'webpay',   label: 'Tarjeta (Webpay)',    icon: 'fa-credit-card'    },
@@ -13,70 +14,6 @@ const QUICK_DURATIONS = [
   { label: '4 horas', days: 0, hours: 4, mins: 0  },
   { label: '1 día',   days: 1, hours: 0, mins: 0  },
 ];
-
-// ── Tiered price calculation ──
-// Applies day rate first, then hour rate, then minute rate.
-// Falls back: minutes without minute rate are rounded up to next hour.
-function calcTotal(days, hours, mins, parking) {
-  const pMin  = parking.price_per_minute;
-  const pHour = parking.precio_hora;
-  const pDay  = parking.price_per_day;
-
-  let remaining = days * 1440 + hours * 60 + mins;
-  if (remaining <= 0) return 0;
-
-  let total = 0;
-
-  if (pDay && remaining >= 1440) {
-    const d = Math.floor(remaining / 1440);
-    total    += d * pDay;
-    remaining -= d * 1440;
-  }
-  if (pHour && remaining >= 60) {
-    const h = Math.floor(remaining / 60);
-    total    += h * pHour;
-    remaining -= h * 60;
-  }
-  if (remaining > 0) {
-    if (pMin)       total += remaining * pMin;
-    else if (pHour) total += pHour;       // round up to next hour
-    else if (pDay)  total += pDay;        // only day rate: round up to next day
-  }
-
-  return Math.round(total);
-}
-
-// ── Price breakdown lines for UI ──
-function calcBreakdown(days, hours, mins, parking) {
-  const pMin  = parking.price_per_minute;
-  const pHour = parking.precio_hora;
-  const pDay  = parking.price_per_day;
-  const lines = [];
-
-  let remaining = days * 1440 + hours * 60 + mins;
-  if (remaining <= 0) return lines;
-
-  if (pDay && remaining >= 1440) {
-    const d = Math.floor(remaining / 1440);
-    lines.push({ label: `${d} día${d > 1 ? 's' : ''}`, rate: `$${pDay.toLocaleString()}/día`, sub: d * pDay });
-    remaining -= d * 1440;
-  }
-  if (pHour && remaining >= 60) {
-    const h = Math.floor(remaining / 60);
-    lines.push({ label: `${h} hora${h > 1 ? 's' : ''}`, rate: `$${pHour.toLocaleString()}/hr`, sub: h * pHour });
-    remaining -= h * 60;
-  }
-  if (remaining > 0) {
-    if (pMin) {
-      lines.push({ label: `${remaining} min`, rate: `$${pMin.toLocaleString()}/min`, sub: remaining * pMin });
-    } else if (pHour) {
-      lines.push({ label: `${remaining} min (redondeo a 1h)`, rate: `$${pHour.toLocaleString()}/hr`, sub: pHour });
-    } else if (pDay) {
-      lines.push({ label: `${remaining} min (redondeo a 1 día)`, rate: `$${pDay.toLocaleString()}/día`, sub: pDay });
-    }
-  }
-  return lines;
-}
 
 function formatDuration(days, hours, mins) {
   const parts = [];
