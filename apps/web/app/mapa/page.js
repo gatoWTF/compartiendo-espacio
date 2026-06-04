@@ -390,6 +390,13 @@ export default function MapaPageContainer() {
             </div>
 
             <div className="res-body">
+              {state.selectedSpot.photos && state.selectedSpot.photos.length > 0 && (
+                <div className="spot-photos">
+                  {state.selectedSpot.photos.map((url, i) => (
+                    <img key={i} src={url} alt={`Foto ${i+1}`} className="spot-photo" />
+                  ))}
+                </div>
+              )}
               <p className="res-row">
                 <i className="fa-solid fa-user-tie" style={{ color: '#64748b', width: '16px' }}></i>
                 <span style={{ color: '#cbd5e1' }}>{state.selectedSpot.arrendador || 'Estacionamiento compartido'}</span>
@@ -728,6 +735,8 @@ export default function MapaPageContainer() {
         .res-body { padding: 14px 20px 16px; }
         .res-row { margin: 0 0 12px 0; font-size: 0.9rem; color: #cbd5e1; display: flex; align-items: center; gap: 12px; }
         .res-row i { color: #64748b; width: 16px; text-align: center; }
+        .spot-photos { display: flex; gap: 8px; overflow-x: auto; margin-bottom: 14px; padding-bottom: 4px; }
+        .spot-photo { width: 100px; height: 70px; object-fit: cover; border-radius: 10px; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.1); }
         
         .pmr-badge-strict {
           display: inline-flex; align-items: center; justify-content: center; gap: 8px;

@@ -671,7 +671,41 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* 5. Publicar */}
+              {/* 5. Fotos */}
+              <div className="form-block">
+                <label className="field-label">
+                  <span className="field-step">5</span>
+                  <i className="fa-solid fa-camera" style={{ color: '#a78bfa', margin: '0 8px' }}></i>
+                  Fotos del estacionamiento <span className="field-optional">(opcional)</span>
+                </label>
+                <p className="field-hint" style={{ marginTop: 0, marginBottom: '12px' }}>
+                  Agrega fotos para que los conductores conozcan tu espacio. Sube varias a la vez.
+                </p>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 18px', background: 'rgba(139,92,246,0.08)', border: '1px dashed rgba(139,92,246,0.3)', borderRadius: '12px', cursor: 'pointer', color: '#a78bfa', fontWeight: 700, fontSize: '0.9rem', transition: '0.2s' }}>
+                  <i className="fa-solid fa-cloud-arrow-up" style={{ fontSize: '1.2rem' }}></i>
+                  {uploadingPhotos ? 'Subiendo fotos...' : 'Seleccionar fotos'}
+                  <input type="file" multiple accept="image/*" style={{ display: 'none' }} onChange={e => handlePhotoUpload(e.target.files)} disabled={uploadingPhotos} />
+                </label>
+                {photos.length > 0 && (
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '12px' }}>
+                    {photos.map((url, i) => (
+                      <div key={i} style={{ position: 'relative' }}>
+                        <img src={url} alt={`Foto ${i+1}`} style={{ width: '80px', height: '60px', objectFit: 'cover', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)' }} />
+                        <button
+                          type="button"
+                          onClick={() => setPhotos(prev => prev.filter((_, idx) => idx !== i))}
+                          style={{ position: 'absolute', top: '-6px', right: '-6px', width: '20px', height: '20px', borderRadius: '50%', background: '#ef4444', border: 'none', color: 'white', fontSize: '0.65rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          title="Eliminar foto"
+                        >
+                          <i className="fa-solid fa-xmark"></i>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 6. Publicar */}
               <div className="form-block">
                 <button type="submit" className="btn-cyber-primary submit-btn" style={{width: '100%'}}>
                   <i className="fa-solid fa-cloud-arrow-up"></i> PUBLICAR ESTACIONAMIENTO
