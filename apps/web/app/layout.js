@@ -14,7 +14,14 @@ export const metadata = {
   applicationName: "Parkings Together",
   keywords: ["estacionamiento", "parking", "Chile", "reserva de estacionamiento", "movilidad reducida", "compartir estacionamiento"],
   authors: [{ name: "Parkings Together" }],
-  icons: { icon: '/favicon.ico' },
+  icons: {
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.ico', sizes: 'any' },
+    ],
+    shortcut: '/favicon.svg',
+    apple: '/favicon.svg',
+  },
   alternates: { canonical: '/' },
   openGraph: {
     title: "Parkings Together",
