@@ -24,6 +24,7 @@ export default function DashboardPage() {
 
   const [nombre, setNombre] = useState('');
   const [direccion, setDireccion] = useState('');
+  const [comuna, setComuna] = useState('');
   const [lat, setLat] = useState('');
   const [lng, setLng] = useState('');
   const [totalSpots, setTotalSpots] = useState(1);
@@ -108,6 +109,46 @@ export default function DashboardPage() {
     if (rr.success) setReservasRecibidas(rr.data || []);
   };
 
+  // ── Auto-completar reservas cuyo tiempo ya terminó ──
+  // El arrendador no debería tener que cerrar manualmente una reserva cuyas
+  // horas ya se cumplieron. Detectamos las confirmadas/activas cuya fecha_fin
+  // ya pasó y las marcamos como completadas automáticamente (igual queda el
+  // botón manual para los casos en que se quiera cerrar antes de tiempo).
+  const autoCompletadasRef = useState(() => new Set())[0];
+  useEffect(() => {
+    if (!reservasRecibidas.length) return;
+    const ahora = Date.now();
+    const vencidas = reservasRecibidas.filter(r =>
+      (r.estado === 'confirmada' || r.estado === 'activa') &&
+      r.fecha_fin && new Date(r.fecha_fin).getTime() < ahora &&
+      !autoCompletadasRef.has(r.id)
+    );
+    if (vencidas.length === 0) return;
+    (async () => {
+      for (const r of vencidas) {
+        autoCompletadasRef.add(r.id);
+        await api.reservas.completar(r.id);
+      }
+      showToast(`${vencidas.length} reserva(s) finalizada(s) automáticamente por tiempo cumplido`, 'success');
+      recargarReservasRecibidas();
+    })();
+  }, [reservasRecibidas, autoCompletadasRef]);
+
+  // Tiempo restante / estado del intervalo de una reserva.
+  const intervaloReserva = (r) => {
+    if (!r.fecha_fin) return null;
+    const fin = new Date(r.fecha_fin).getTime();
+    const ini = r.fecha_inicio ? new Date(r.fecha_inicio).getTime() : null;
+    const ahora = Date.now();
+    if (fin < ahora) return { vencida: true, texto: 'Tiempo cumplido' };
+    const minRestantes = Math.round((fin - ahora) / 60000);
+    if (ini && ini > ahora) {
+      const minInicio = Math.round((ini - ahora) / 60000);
+      return { vencida: false, futura: true, texto: `Empieza en ${minInicio < 60 ? `${minInicio} min` : `${Math.round(minInicio / 60)} h`}` };
+    }
+    return { vencida: false, texto: `Quedan ${minRestantes < 60 ? `${minRestantes} min` : `${Math.round(minRestantes / 60)} h`}` };
+  };
+
   const gestionarReserva = async (accion, id) => {
     const fn = { confirmar: api.reservas.confirmar, completar: api.reservas.completar, cancelar: api.reservas.cancelar }[accion];
     showToast('Procesando reserva...', 'syncing');
@@ -118,6 +159,12 @@ export default function DashboardPage() {
 
   const fmtFechaR = (f) => f ? new Date(f).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
 
+  // Rellena automáticamente la dirección (y la comuna) al elegir un punto en el mapa.
+  const handleAddressResolved = (texto, comunaDetectada) => {
+    setDireccion(texto);
+    if (comunaDetectada) setComuna(comunaDetectada);
+  };
+
   const handleSearchAddress = async () => {
     if (!direccion.trim()) return;
     try {
@@ -126,6 +173,9 @@ export default function DashboardPage() {
       if (data && data.length > 0) {
         setLat(data[0].lat);
         setLng(data[0].lon);
+        // Intenta extraer la comuna del nombre devuelto por el geocodificador.
+        const partes = (data[0].display_name || '').split(',').map(s => s.trim());
+        if (partes.length >= 2) setComuna(partes[1]);
         showToast('¡Dirección ubicada y fijada en el mapa!', 'success');
       } else {
         showToast('Dirección no encontrada.', 'error');
@@ -151,6 +201,7 @@ export default function DashboardPage() {
         totalSpots: parseInt(totalSpots),
         esPmr,
         userId: session.user.id,
+        comuna:             comuna || undefined,
         precioHora:         precioHora     ? parseFloat(precioHora)     : undefined,
         pricePerMinute:     pricePerMinute ? parseFloat(pricePerMinute) : undefined,
         pricePerDay:        pricePerDay    ? parseFloat(pricePerDay)    : undefined,
@@ -159,7 +210,7 @@ export default function DashboardPage() {
 
       if (result.success && result.data) {
         setMyParkings(prev => [result.data, ...prev]);
-        setNombre(''); setDireccion(''); setLat(''); setLng(''); setTotalSpots(1); setEsPmr(false);
+        setNombre(''); setDireccion(''); setComuna(''); setLat(''); setLng(''); setTotalSpots(1); setEsPmr(false);
         setPrecioHora(''); setPricePerMinute(''); setPricePerDay('');
         setAllowedVehicleTypes(['car']);
         showToast('¡Estacionamiento publicado con éxito!', 'success');
@@ -473,27 +524,49 @@ export default function DashboardPage() {
             <form onSubmit={handleCreate} className="create-form">
               {/* 1. Ubicar espacio */}
               <div className="form-block">
+                <label className="field-label">
+                  <span className="field-step">1</span> ¿Dónde está tu estacionamiento?
+                </label>
                 <div className="input-group search-group">
                   <i className="fa-solid fa-map-pin icon"></i>
-                  <input type="text" placeholder="Ej: Avenida Falsa 123" value={direccion} onChange={e => setDireccion(e.target.value)} />
-                  <button type="button" onClick={handleSearchAddress} className="btn-search">UBICAR EN EL MAPA</button>
+                  <input type="text" placeholder="Escribe la dirección. Ej: Av. Providencia 123" value={direccion} onChange={e => setDireccion(e.target.value)} />
+                  <button type="button" onClick={handleSearchAddress} className="btn-search">Buscar</button>
                 </div>
-                
+                <p className="field-hint">
+                  <i className="fa-solid fa-hand-pointer" style={{ marginRight: '6px', color: '#60a5fa' }}></i>
+                  También puedes <strong>tocar el mapa</strong> en el lugar exacto: la dirección se completará sola.
+                </p>
+
                 <div className="map-container">
-                  <MiniMapComponent lat={lat} lng={lng} setLat={setLat} setLng={setLng} />
+                  <MiniMapComponent lat={lat} lng={lng} setLat={setLat} setLng={setLng} onAddressResolved={handleAddressResolved} />
                 </div>
+                {lat && lng && (
+                  <p className="field-hint" style={{ color: '#10b981' }}>
+                    <i className="fa-solid fa-circle-check" style={{ marginRight: '6px' }}></i>
+                    Ubicación fijada{comuna ? ` en ${comuna}` : ''}. Ya puedes continuar.
+                  </p>
+                )}
               </div>
               
               {/* 2. Configurar características */}
               <div className="form-block">
+                <label className="field-label">
+                  <span className="field-step">2</span> Datos de tu plaza
+                </label>
                 <div className="input-row">
-                  <div className="input-group">
-                    <i className="fa-solid fa-signature icon"></i>
-                    <input type="text" placeholder="Nombre de la Plaza" value={nombre} onChange={e => setNombre(e.target.value)} required />
+                  <div style={{ flex: 1 }}>
+                    <span className="tarifa-cap"><i className="fa-solid fa-signature"></i> Nombre que verán los conductores</span>
+                    <div className="input-group">
+                      <i className="fa-solid fa-signature icon"></i>
+                      <input type="text" placeholder="Ej: Estacionamiento Casa Centro" value={nombre} onChange={e => setNombre(e.target.value)} required />
+                    </div>
                   </div>
-                  <div className="input-group">
-                    <i className="fa-solid fa-car icon"></i>
-                    <input type="number" min="1" placeholder="Cupos" value={totalSpots} onChange={e => setTotalSpots(e.target.value)} required />
+                  <div style={{ flex: 1 }}>
+                    <span className="tarifa-cap"><i className="fa-solid fa-car"></i> Cantidad de cupos</span>
+                    <div className="input-group">
+                      <i className="fa-solid fa-car icon"></i>
+                      <input type="number" min="1" placeholder="Ej: 3" value={totalSpots} onChange={e => setTotalSpots(e.target.value)} required />
+                    </div>
                   </div>
                 </div>
                 
@@ -508,33 +581,48 @@ export default function DashboardPage() {
               
               {/* 3. Tarifas */}
               <div className="form-block">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                  <i className="fa-solid fa-coins" style={{ color: '#f59e0b' }}></i>
-                  <span style={{ color: 'white', fontWeight: 700, fontSize: '1rem' }}>Configuración de Tarifas</span>
+                <label className="field-label">
+                  <span className="field-step">3</span>
+                  <i className="fa-solid fa-coins" style={{ color: '#f59e0b', margin: '0 8px' }}></i>
+                  ¿Cuánto quieres cobrar? <span className="field-optional">(opcional)</span>
+                </label>
+                <p className="field-hint" style={{ marginTop: 0, marginBottom: '12px' }}>
+                  Completa solo las tarifas que quieras ofrecer. Puedes dejarlas en blanco y definirlas después.
+                  El sistema elige automáticamente la opción más conveniente para quien reserva.
+                </p>
+                <div className="tarifa-grid">
+                  <div className="tarifa-field">
+                    <span className="tarifa-cap"><i className="fa-solid fa-clock"></i> Por hora</span>
+                    <div className="input-group">
+                      <span className="tarifa-prefix">$</span>
+                      <input type="number" min="0" placeholder="1.500" value={precioHora} onChange={e => setPrecioHora(e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="tarifa-field">
+                    <span className="tarifa-cap"><i className="fa-solid fa-stopwatch"></i> Por minuto</span>
+                    <div className="input-group">
+                      <span className="tarifa-prefix">$</span>
+                      <input type="number" min="0" placeholder="50" value={pricePerMinute} onChange={e => setPricePerMinute(e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="tarifa-field">
+                    <span className="tarifa-cap"><i className="fa-solid fa-calendar-day"></i> Por día</span>
+                    <div className="input-group">
+                      <span className="tarifa-prefix">$</span>
+                      <input type="number" min="0" placeholder="12.000" value={pricePerDay} onChange={e => setPricePerDay(e.target.value)} />
+                    </div>
+                  </div>
                 </div>
-                <div className="input-row" style={{ flexDirection: 'row' }}>
-                  <div className="input-group" style={{ flex: 1 }}>
-                    <i className="fa-solid fa-clock icon"></i>
-                    <input type="number" min="0" placeholder="Por hora (CLP)" value={precioHora} onChange={e => setPrecioHora(e.target.value)} />
-                  </div>
-                  <div className="input-group" style={{ flex: 1 }}>
-                    <i className="fa-solid fa-stopwatch icon"></i>
-                    <input type="number" min="0" placeholder="Por minuto (CLP)" value={pricePerMinute} onChange={e => setPricePerMinute(e.target.value)} />
-                  </div>
-                  <div className="input-group" style={{ flex: 1 }}>
-                    <i className="fa-solid fa-calendar-day icon"></i>
-                    <input type="number" min="0" placeholder="Por día (CLP)" value={pricePerDay} onChange={e => setPricePerDay(e.target.value)} />
-                  </div>
-                </div>
-                <p style={{ color: '#64748b', fontSize: '0.78rem', marginTop: '6px' }}>Define las tarifas disponibles. El sistema aplica automáticamente la combinación más conveniente para el usuario.</p>
               </div>
 
               {/* 4. Vehículos admitidos */}
               <div className="form-block">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                  <i className="fa-solid fa-car" style={{ color: '#3b82f6' }}></i>
-                  <span style={{ color: 'white', fontWeight: 700, fontSize: '1rem' }}>Vehículos Admitidos</span>
-                </div>
+                <label className="field-label">
+                  <span className="field-step">4</span>
+                  <i className="fa-solid fa-car" style={{ color: '#3b82f6', margin: '0 8px' }}></i>
+                  ¿Qué vehículos aceptas?
+                </label>
+                <p className="field-hint" style={{ marginTop: 0, marginBottom: '12px' }}>Toca para activar o desactivar cada tipo. Al menos uno debe quedar seleccionado.</p>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '10px' }}>
                   {[
                     { id: 'car',        label: 'Auto',      icon: 'fa-car'           },
@@ -572,7 +660,25 @@ export default function DashboardPage() {
         {session?.user?.rol === 'arrendador' && (
           <div className="glass-panel form-panel">
             <h3><i className="fa-solid fa-calendar-check"></i> Reservas Recibidas ({reservasRecibidas.length})</h3>
-            <p className="panel-desc">Confirma, completa o cancela las reservas de tus estacionamientos.</p>
+            <p className="panel-desc">Confirma o cancela tus reservas. Las que cumplen su horario se cierran solas.</p>
+
+            {/* Resumen de disponibilidad actual */}
+            {myParkings.length > 0 && (
+              <div className="disp-summary">
+                <span className="disp-summary-title"><i className="fa-solid fa-list-check"></i> Disponibilidad ahora</span>
+                {myParkings.filter(p => p.activo !== false).map(p => {
+                  const libres = Math.max((p.total_spots || 0) - (p.occupied_spots || 0), 0);
+                  return (
+                    <div key={p.id} className="disp-row">
+                      <span className="disp-name">{p.nombre}</span>
+                      <span className={`disp-pill ${libres === 0 ? 'red' : 'green'}`}>
+                        {libres === 0 ? 'Sin cupos' : `${libres} libre${libres > 1 ? 's' : ''}`} · {p.occupied_spots || 0}/{p.total_spots} ocupados
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             {reservasRecibidas.length === 0 ? (
               <div className="glass-panel empty-state" style={{ marginTop: '10px' }}>
@@ -581,12 +687,31 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="reservas-recibidas">
-                {reservasRecibidas.map(r => (
+                {reservasRecibidas.map(r => {
+                  const intv = intervaloReserva(r);
+                  return (
                   <div key={r.id} className="reserva-row">
                     <div className="reserva-info">
                       <strong>{r.estacionamiento?.nombre || 'Estacionamiento'}</strong>
-                      <span>{fmtFechaR(r.fecha_inicio)} → {fmtFechaR(r.fecha_fin)}</span>
-                      <span className={`estado-badge estado-${r.estado}`}>{r.estado}</span>
+                      <span><i className="fa-solid fa-clock" style={{ width: '14px', color: '#64748b' }}></i> {fmtFechaR(r.fecha_inicio)} → {fmtFechaR(r.fecha_fin)}</span>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginTop: '2px' }}>
+                        <span className={`estado-badge estado-${r.estado}`}>{r.estado}</span>
+                        {intv && (r.estado === 'confirmada' || r.estado === 'activa' || r.estado === 'pendiente') && (
+                          <span className={`intervalo-badge ${intv.vencida ? 'vencida' : intv.futura ? 'futura' : 'activa'}`}>
+                            <i className={`fa-solid ${intv.vencida ? 'fa-flag-checkered' : 'fa-hourglass-half'}`}></i> {intv.texto}
+                          </span>
+                        )}
+                        {r.precio_total != null && (
+                          <span style={{ color: '#f59e0b', fontWeight: 700, fontSize: '0.82rem' }}>
+                            ${Number(r.precio_total).toLocaleString('es-CL')}
+                          </span>
+                        )}
+                        {r.estacionamiento?.comuna && (
+                          <span style={{ color: '#64748b', fontSize: '0.8rem' }}>
+                            <i className="fa-solid fa-location-dot"></i> {r.estacionamiento.comuna}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="reserva-acts">
                       {r.estado === 'pendiente' && (
@@ -606,7 +731,8 @@ export default function DashboardPage() {
                       )}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -615,13 +741,22 @@ export default function DashboardPage() {
         {/* INVENTARIO / MIS VEHICULOS */}
         <div className="inventory-panel">
           <div className="inventory-header">
-            <h3>
-              {session?.user?.rol === 'arrendador' ? (
-                <><i className="fa-solid fa-warehouse"></i> Mis Estacionamientos ({myParkings.length})</>
-              ) : (
-                <><i className="fa-solid fa-car"></i> Mis Vehículos ({myParkings.length})</>
+            <div style={{ minWidth: 0 }}>
+              <h3>
+                {session?.user?.rol === 'arrendador' ? (
+                  <><i className="fa-solid fa-warehouse"></i> Mis Estacionamientos ({myParkings.length})</>
+                ) : (
+                  <><i className="fa-solid fa-car"></i> Mis Vehículos ({myParkings.length})</>
+                )}
+              </h3>
+              {session?.user?.rol === 'arrendador' && myParkings.length > 0 && (
+                <p style={{ color: '#94a3b8', fontSize: '0.82rem', margin: '6px 0 0', lineHeight: 1.5 }}>
+                  Aquí administras cada plaza. Usa <i className="fa-solid fa-pen-to-square" style={{ color: '#60a5fa' }}></i> para editar,
+                  el <i className="fa-solid fa-eye-slash" style={{ color: '#f59e0b' }}></i> para ocultarla del mapa, y los botones
+                  <strong style={{ color: '#cbd5e1' }}> − / +</strong> para indicar cuántos cupos están ocupados ahora.
+                </p>
               )}
-            </h3>
+            </div>
             {myParkings.length > 0 && session?.user?.rol === 'arrendador' && (
               <div className="inventory-actions">
                 <button onClick={selectAll} className="btn-cyber-secondary action-btn" aria-label={selectedIds.length === myParkings.length ? 'Desmarcar todos' : 'Seleccionar todos'}>
@@ -738,6 +873,22 @@ export default function DashboardPage() {
         .estado-activa { background: rgba(16, 185, 129, 0.15); color: #10b981; }
         .estado-completada { background: rgba(148, 163, 184, 0.15); color: #94a3b8; }
         .estado-cancelada { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+
+        .intervalo-badge { display: inline-flex; align-items: center; gap: 5px; padding: 2px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 700; }
+        .intervalo-badge.activa { background: rgba(16,185,129,0.12); color: #34d399; }
+        .intervalo-badge.futura { background: rgba(59,130,246,0.12); color: #60a5fa; }
+        .intervalo-badge.vencida { background: rgba(148,163,184,0.15); color: #cbd5e1; }
+
+        /* Resumen de disponibilidad */
+        .disp-summary { background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 14px 16px; margin-bottom: 18px; }
+        .disp-summary-title { display: flex; align-items: center; gap: 8px; color: #94a3b8; font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+        .disp-summary-title i { color: #60a5fa; }
+        .disp-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid rgba(255,255,255,0.04); }
+        .disp-row:first-of-type { border-top: none; }
+        .disp-name { color: #e2e8f0; font-weight: 700; font-size: 0.88rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .disp-pill { font-size: 0.74rem; font-weight: 700; padding: 3px 10px; border-radius: 20px; white-space: nowrap; flex-shrink: 0; }
+        .disp-pill.green { background: rgba(16,185,129,0.12); color: #34d399; }
+        .disp-pill.red { background: rgba(239,68,68,0.12); color: #f87171; }
         
         .dashboard-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 30px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 20px; flex-wrap: wrap; gap: 20px; }
         .header-titles h2 { font-size: 2.2rem; color: #3b82f6; margin: 0; font-weight: 900; letter-spacing: -1px; }
@@ -775,7 +926,22 @@ export default function DashboardPage() {
         .input-group:focus-within { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
         .input-group .icon { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #64748b; }
         .input-group input { width: 100%; padding: 15px 15px 15px 45px; background: transparent; border: none; color: white; outline: none; }
-        
+
+        /* Etiquetas amigables de pasos */
+        .field-label { display: flex; align-items: center; color: #f1f5f9; font-weight: 800; font-size: 1.02rem; margin-bottom: 8px; }
+        .field-step { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 8px; background: rgba(59,130,246,0.18); color: #60a5fa; font-size: 0.82rem; font-weight: 900; margin-right: 10px; flex-shrink: 0; }
+        .field-optional { color: #64748b; font-weight: 600; font-size: 0.85rem; margin-left: 6px; }
+        .field-hint { color: #94a3b8; font-size: 0.82rem; line-height: 1.5; margin: 8px 0 0; }
+
+        /* Tarifas: cada campo con su etiqueta clara, sin recortes */
+        .tarifa-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+        .tarifa-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+        .tarifa-cap { color: #94a3b8; font-size: 0.78rem; font-weight: 700; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+        .tarifa-cap i { color: #64748b; }
+        .tarifa-field .input-group input { padding-left: 30px; }
+        .tarifa-prefix { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #f59e0b; font-weight: 800; z-index: 1; }
+        @media (max-width: 600px) { .tarifa-grid { grid-template-columns: 1fr; } }
+
         .search-group { display: flex; flex-direction: row; padding-right: 5px; }
         .btn-search { background: #3b82f6; color: white; border: none; border-radius: 8px; margin: 5px; padding: 0 15px; font-weight: 800; cursor: pointer; transition: 0.3s; }
         .btn-search:hover { background: #2563eb; }
@@ -790,7 +956,7 @@ export default function DashboardPage() {
         .submit-btn { padding: 18px; font-size: 1.1rem; border-radius: 12px; margin-top: 10px; }
         
         .inventory-panel { flex: 1.2; min-width: 0; }
-        .inventory-header { display: flex; justify-content: space-between; align-items: center; background: rgba(30, 41, 59, 0.6); padding: 20px; border-radius: 16px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.05); flex-wrap: wrap; gap: 15px; }
+        .inventory-header { display: flex; justify-content: space-between; align-items: flex-start; background: rgba(30, 41, 59, 0.6); padding: 20px; border-radius: 16px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.05); flex-wrap: wrap; gap: 15px; }
         .inventory-header h3 { margin: 0; display: flex; align-items: center; gap: 10px; }
         .inventory-actions { display: flex; gap: 10px; }
         .action-btn { padding: 8px 15px; font-size: 0.85rem; }

@@ -662,6 +662,8 @@ export default function MapaPageContainer() {
           right: 24px;
           width: 320px;
           max-width: calc(100vw - 48px);
+          max-height: calc(100% - 48px);
+          overflow-y: auto;
           z-index: 1000;
           transform: translateX(120%);
           transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
