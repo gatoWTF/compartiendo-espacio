@@ -421,7 +421,7 @@ export default function MapaPageContainer() {
                 </div>
               )}
 
-              <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
                 {state.reserveError && (
                   <div style={{ color: '#f87171', fontSize: '0.82rem', padding: '8px 12px', background: 'rgba(239,68,68,0.08)', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.2)', marginBottom: '10px', textAlign: 'center' }}>
                     {state.reserveError}
@@ -662,7 +662,8 @@ export default function MapaPageContainer() {
           right: 24px;
           width: 320px;
           max-width: calc(100vw - 48px);
-          max-height: calc(100% - 48px);
+          /* Limit to viewport height so the button is never clipped */
+          max-height: calc(100vh - 130px);
           overflow-y: auto;
           z-index: 1000;
           transform: translateX(120%);
@@ -682,7 +683,7 @@ export default function MapaPageContainer() {
         }
         .btn-close-strict:hover { color: white; }
         
-        .res-body { padding: 20px; }
+        .res-body { padding: 14px 20px 16px; }
         .res-row { margin: 0 0 12px 0; font-size: 0.9rem; color: #cbd5e1; display: flex; align-items: center; gap: 12px; }
         .res-row i { color: #64748b; width: 16px; text-align: center; }
         

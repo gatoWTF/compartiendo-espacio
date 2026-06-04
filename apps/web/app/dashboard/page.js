@@ -796,6 +796,7 @@ export default function DashboardPage() {
                 const isInactive = parking.activo === false;
                 return (
                   <div key={parking.id} className={`glass-panel parking-item ${isSelected ? 'selected' : ''} ${isInactive ? 'inactive-parking' : ''}`}>
+                    {/* ── Zona Izquierda: checkbox + info ── */}
                     <div className="item-info">
                       <input type="checkbox" checked={isSelected} onChange={() => toggleSelection(parking.id)} className="custom-checkbox" />
                       <div style={{ minWidth: 0 }}>
@@ -814,35 +815,34 @@ export default function DashboardPage() {
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                      {/* Edit button */}
-                      <button
-                        onClick={() => openEdit(parking)}
-                        title="Editar"
-                        aria-label="Editar estacionamiento"
-                        style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: '10px', color: '#60a5fa', cursor: 'pointer', padding: '8px 10px', fontSize: '0.9rem', transition: 'all 0.15s' }}
-                      >
-                        <i className="fa-solid fa-pen-to-square"></i>
-                      </button>
+                    {/* ── Zona Derecha: controles ── */}
+                    <div className="item-controls">
+                      <div className="item-action-btns">
+                        <button
+                          onClick={() => openEdit(parking)}
+                          title="Editar"
+                          aria-label="Editar estacionamiento"
+                          className="ctrl-action-btn blue"
+                        >
+                          <i className="fa-solid fa-pen-to-square"></i>
+                        </button>
+                        <button
+                          onClick={() => handleToggleActivo(parking)}
+                          title={isInactive ? 'Reactivar' : 'Desactivar'}
+                          aria-label={isInactive ? 'Reactivar plaza' : 'Desactivar plaza'}
+                          className={`ctrl-action-btn ${isInactive ? 'green' : 'amber'}`}
+                        >
+                          <i className={`fa-solid ${isInactive ? 'fa-eye' : 'fa-eye-slash'}`}></i>
+                        </button>
+                      </div>
 
-                      {/* Deactivate / Reactivate toggle */}
-                      <button
-                        onClick={() => handleToggleActivo(parking)}
-                        title={isInactive ? 'Reactivar' : 'Desactivar'}
-                        aria-label={isInactive ? 'Reactivar plaza' : 'Desactivar plaza'}
-                        style={{ background: isInactive ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)', border: `1px solid ${isInactive ? 'rgba(16,185,129,0.25)' : 'rgba(245,158,11,0.25)'}`, borderRadius: '10px', color: isInactive ? '#10b981' : '#f59e0b', cursor: 'pointer', padding: '8px 10px', fontSize: '0.9rem', transition: 'all 0.15s' }}
-                      >
-                        <i className={`fa-solid ${isInactive ? 'fa-eye' : 'fa-eye-slash'}`}></i>
-                      </button>
-
-                      {/* Occupancy controls (only when active) */}
                       {!isInactive && (
                         <div className="occupancy-controls">
-                          <button onClick={() => updateOccupancy(parking.id, parking.occupied_spots, parking.total_spots, -1)} disabled={parking.occupied_spots === 0} className="ctrl-btn minus">
+                          <button onClick={() => updateOccupancy(parking.id, parking.occupied_spots, parking.total_spots, -1)} disabled={parking.occupied_spots === 0} className="ctrl-btn minus" aria-label="Reducir cupos ocupados">
                             <i className="fa-solid fa-minus"></i>
                           </button>
                           <strong>{parking.occupied_spots}</strong>
-                          <button onClick={() => updateOccupancy(parking.id, parking.occupied_spots, parking.total_spots, 1)} disabled={isFull} className="ctrl-btn plus">
+                          <button onClick={() => updateOccupancy(parking.id, parking.occupied_spots, parking.total_spots, 1)} disabled={isFull} className="ctrl-btn plus" aria-label="Aumentar cupos ocupados">
                             <i className="fa-solid fa-plus"></i>
                           </button>
                         </div>
@@ -967,29 +967,48 @@ export default function DashboardPage() {
         .empty-state i { font-size: 3rem; margin-bottom: 20px; opacity: 0.5; }
         .empty-state p { font-weight: 700; }
         
-        .parking-list { display: flex; flex-direction: column; gap: 15px; }
-        .parking-item { display: flex; justify-content: space-between; align-items: center; padding: 20px; transition: 0.3s; }
+        .parking-list { display: flex; flex-direction: column; gap: 12px; }
+
+        /* Card: info left, controls right; stacks vertically on narrow viewports */
+        .parking-item {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 16px 18px;
+          gap: 14px;
+          transition: 0.3s;
+          flex-wrap: wrap;
+        }
         .parking-item.selected { border-color: #ef4444; background: rgba(239, 68, 68, 0.05); }
         .parking-item.inactive-parking { opacity: 0.55; border-color: rgba(100,116,139,0.2); }
-        .parking-item:hover { transform: translateX(5px); }
-        
-        .item-info { display: flex; align-items: center; gap: 20px; }
-        .custom-checkbox { width: 20px; height: 20px; accent-color: #ef4444; cursor: pointer; }
-        .item-info h4 { margin: 0 0 8px 0; font-size: 1.2rem; font-weight: 800; display: flex; align-items: center; }
-        .pmr-icon { color: #38bdf8; margin-left: 10px; font-size: 0.9rem; }
-        
-        .status-badges { display: flex; gap: 10px; align-items: center; }
-        .badge { font-size: 0.7rem; padding: 4px 10px; border-radius: 6px; font-weight: 900; }
+        .parking-item:hover { transform: translateX(4px); }
+
+        /* Left zone */
+        .item-info { display: flex; align-items: center; gap: 14px; min-width: 0; flex: 1; }
+        .custom-checkbox { width: 18px; height: 18px; accent-color: #ef4444; cursor: pointer; flex-shrink: 0; }
+        .item-info h4 { margin: 0 0 6px 0; font-size: 1rem; font-weight: 800; display: flex; align-items: center; }
+        .pmr-icon { color: #38bdf8; margin-left: 8px; font-size: 0.85rem; }
+        .status-badges { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .badge { font-size: 0.68rem; padding: 3px 9px; border-radius: 6px; font-weight: 900; white-space: nowrap; }
         .badge.green { background: rgba(16, 185, 129, 0.2); color: #10b981; }
         .badge.red { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
-        .spots-info { color: #94a3b8; font-size: 0.8rem; font-weight: 700; display: flex; align-items: center; gap: 5px; }
-        
-        .occupancy-controls { display: flex; align-items: center; gap: 15px; background: rgba(0,0,0,0.5); padding: 8px 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); }
-        .ctrl-btn { background: transparent; border: none; font-size: 1.2rem; cursor: pointer; transition: 0.3s; display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 8px; }
+        .spots-info { color: #94a3b8; font-size: 0.78rem; font-weight: 700; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+
+        /* Right zone: action buttons + occupancy in a vertical stack */
+        .item-controls { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex-shrink: 0; }
+        .item-action-btns { display: flex; gap: 6px; }
+        .ctrl-action-btn { border-radius: 10px; cursor: pointer; padding: 7px 9px; font-size: 0.88rem; transition: all 0.15s; border-width: 1px; border-style: solid; }
+        .ctrl-action-btn.blue { background: rgba(59,130,246,0.1); border-color: rgba(59,130,246,0.25); color: #60a5fa; }
+        .ctrl-action-btn.green { background: rgba(16,185,129,0.1); border-color: rgba(16,185,129,0.25); color: #10b981; }
+        .ctrl-action-btn.amber { background: rgba(245,158,11,0.1); border-color: rgba(245,158,11,0.25); color: #f59e0b; }
+
+        /* Occupancy counter: smaller and compact */
+        .occupancy-controls { display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.4); padding: 5px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); }
+        .ctrl-btn { background: transparent; border: none; cursor: pointer; transition: 0.3s; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 7px; font-size: 0.8rem; }
         .ctrl-btn.minus { color: #10b981; background: rgba(16, 185, 129, 0.1); }
         .ctrl-btn.plus { color: #ef4444; background: rgba(239, 68, 68, 0.1); }
         .ctrl-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-        .occupancy-controls strong { font-size: 1.4rem; color: white; min-width: 25px; text-align: center; }
+        .occupancy-controls strong { font-size: 1rem; color: white; min-width: 20px; text-align: center; }
         
         @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.5); opacity: 0.5; } 100% { transform: scale(1); opacity: 1; } }
         @keyframes slideLeft { from { transform: translateX(100px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
