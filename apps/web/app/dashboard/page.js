@@ -60,7 +60,7 @@ export default function DashboardPage() {
       const { data: { session: authSession } } = await supabase.auth.getSession();
       
       if (!authSession?.user) {
-        router.push('/auth');
+        router.push('/auth?redirectTo=/dashboard');
         return;
       }
 

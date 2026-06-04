@@ -29,6 +29,13 @@ export default function AuthPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  // Destino tras autenticarse: respeta ?redirectTo=... (p.ej. /dashboard) o /mapa.
+  const getDestino = () => {
+    const dest = searchParams.get('redirectTo');
+    // Solo permitimos rutas internas (evita open-redirect a dominios externos).
+    return dest && dest.startsWith('/') && !dest.startsWith('//') ? dest : '/mapa';
+  };
+
   useEffect(() => {
     const errorMsg = searchParams.get('error');
     if (errorMsg) toast.error(decodeURIComponent(errorMsg));
@@ -73,8 +80,9 @@ export default function AuthPage() {
 
         setSuccessAnim(true);
         toast.success("¡Autenticación exitosa!");
+        const destino = getDestino();
         setTimeout(() => {
-          router.push('/mapa');
+          router.push(destino);
         }, 1500);
 
       } else {
@@ -98,7 +106,8 @@ export default function AuthPage() {
 
         setSuccessAnim(true);
         toast.success("¡Cuenta creada exitosamente!");
-        setTimeout(() => router.push('/mapa'), 1500);
+        const destino = getDestino();
+        setTimeout(() => router.push(destino), 1500);
       }
     } catch (err) {
       console.error(err);

@@ -29,11 +29,11 @@ export default function ReservasPage() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
-      if (!s) { router.push('/auth'); return; }
+      if (!s) { router.push('/auth?redirectTo=/reservas'); return; }
       setSession(s);
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => {
-      if (!s) router.push('/auth');
+      if (!s) router.push('/auth?redirectTo=/reservas');
       else setSession(s);
     });
     return () => subscription.unsubscribe();
