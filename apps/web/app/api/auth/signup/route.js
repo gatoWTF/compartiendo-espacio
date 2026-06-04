@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServiceSupabase } from '@parkings/supabase-db';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PW_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]).{8,}$/;
+const PW_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()\-_=+[\]{};':",.<>/?`~\\|]).{8,}$/;
 
 const ipCounts = new Map();
 const WINDOW_MS = 60 * 60 * 1000;
@@ -11,10 +11,7 @@ const MAX_PER_WINDOW = 10;
 function checkRateLimit(ip) {
   const now = Date.now();
   const entry = ipCounts.get(ip);
-  if (!entry || now - entry.start > WINDOW_MS) {
-    ipCounts.set(ip, { start: now, count: 1 });
-    return true;
-  }
+  if (!entry || now - entry.start > WINDOW_MS) { ipCounts.set(ip, { start: now, count: 1 }); return true; }
   entry.count++;
   return entry.count <= MAX_PER_WINDOW;
 }
@@ -26,14 +23,12 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Demasiados intentos. Espera unos minutos.' }, { status: 429 });
     }
 
-    const { email, password, nombre, rol } = await request.json();
+    const { email, password, nombre, apellido, rol, telefono, tipo_vehiculo, empresa } = await request.json();
 
-    if (!email || !password || !nombre || !rol) {
+    if (!email || !password || !nombre || !apellido || !rol) {
       return NextResponse.json({ error: 'Faltan campos requeridos.' }, { status: 400 });
     }
-    if (!EMAIL_RE.test(email)) {
-      return NextResponse.json({ error: 'Email inválido.' }, { status: 400 });
-    }
+    if (!EMAIL_RE.test(email)) return NextResponse.json({ error: 'Email inválido.' }, { status: 400 });
     if (!PW_RE.test(password)) {
       return NextResponse.json({ error: 'Contraseña insegura: mínimo 8 caracteres, incluye mayúscula, minúscula, número y símbolo.' }, { status: 400 });
     }
@@ -47,7 +42,7 @@ export async function POST(request) {
       email,
       password,
       email_confirm: true,
-      user_metadata: { nombre, rol },
+      user_metadata: { nombre, apellido, rol },
     });
 
     if (createError) {
@@ -58,15 +53,18 @@ export async function POST(request) {
       return NextResponse.json({ error: 'No se pudo crear la cuenta.' }, { status: 400 });
     }
 
-    const { error: profileError } = await admin.from('perfiles').upsert({
+    const profilePayload = {
       id: userData.user.id,
-      nombre,
+      nombre: `${nombre} ${apellido}`.trim(),
+      apellido: apellido || null,
       rol,
-    }, { onConflict: 'id' });
+      telefono: telefono || null,
+      tipo_vehiculo: rol === 'cliente' ? (tipo_vehiculo || null) : null,
+      empresa: rol === 'arrendador' ? (empresa || null) : null,
+    };
 
-    if (profileError) {
-      console.error('[signup] Profile error:', profileError.message);
-    }
+    const { error: profileError } = await admin.from('perfiles').upsert(profilePayload, { onConflict: 'id' });
+    if (profileError) console.error('[signup] Profile error:', profileError.message);
 
     const { createClient } = await import('@supabase/supabase-js');
     const anonClient = createClient(
@@ -75,29 +73,16 @@ export async function POST(request) {
       { auth: { persistSession: false } }
     );
 
-    const { data: sessionData, error: signInError } = await anonClient.auth.signInWithPassword({
-      email,
-      password,
-    });
-
+    const { data: sessionData, error: signInError } = await anonClient.auth.signInWithPassword({ email, password });
     if (signInError) {
-      return NextResponse.json({
-        success: true,
-        autoLogin: false,
-        message: 'Cuenta creada. Inicia sesión manualmente.',
-      });
+      return NextResponse.json({ success: true, autoLogin: false, message: 'Cuenta creada. Inicia sesión manualmente.' });
     }
 
     return NextResponse.json({
       success: true,
       autoLogin: true,
       session: sessionData.session,
-      user: {
-        id: userData.user.id,
-        email: userData.user.email,
-        nombre,
-        rol,
-      },
+      user: { id: userData.user.id, email: userData.user.email, nombre, apellido, rol },
     });
 
   } catch (err) {

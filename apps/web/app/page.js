@@ -162,7 +162,7 @@ export default function HomePage() {
 
       <footer className="landing-footer">
         <p style={{ color: '#475569', fontSize: '0.85rem' }}>Parkings Together 2026 Plataforma de estacionamientos compartidos</p>
-        <p className="sub">Gabriel Molina y Guillermo Santander</p>
+        <p className="sub">Dareko</p>
       </footer>
 
       <style jsx>{`
