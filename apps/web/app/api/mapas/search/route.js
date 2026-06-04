@@ -160,6 +160,8 @@ export async function POST(request) {
         ? body.allowedVehicleTypes
         : ['car'],
       comuna: body.comuna || null,
+      descripcion: body.descripcion || null,
+      direccion: body.direccion || null,
     };
 
     const { data, error } = await db
@@ -223,6 +225,8 @@ export async function PATCH(request) {
       if (body.pricePerMinute !== undefined) updates.price_per_minute = body.pricePerMinute ? parseFloat(body.pricePerMinute) : null;
       if (body.pricePerDay !== undefined) updates.price_per_day = body.pricePerDay ? Math.round(parseFloat(body.pricePerDay)) : null;
       if (Array.isArray(body.allowedVehicleTypes)) updates.allowed_vehicle_types = body.allowedVehicleTypes;
+      if ('descripcion' in body) updates.descripcion = body.descripcion || null;
+      if ('direccion'   in body) updates.direccion   = body.direccion   || null;
 
       const { data, error } = await db
         .from('estacionamientos')

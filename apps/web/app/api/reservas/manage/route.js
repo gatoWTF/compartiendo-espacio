@@ -63,7 +63,7 @@ export async function PATCH(request) {
     const token = getToken(request);
     if (!token) return NextResponse.json({ success: false, error: 'No autenticado.' }, { status: 401 });
 
-    const { action, reserva_id, fecha_inicio, fecha_fin, calificacion, comentario } = await request.json();
+    const { action, reserva_id, fecha_inicio, fecha_fin, calificacion, comentario, review_photo_url } = await request.json();
     if (!action || !reserva_id) {
       return NextResponse.json({ success: false, error: 'Faltan action o reserva_id.' }, { status: 400 });
     }
@@ -91,6 +91,13 @@ export async function PATCH(request) {
           p_calificacion: cal,
           p_comentario: comentario ? String(comentario).slice(0, 500) : null,
         });
+        // Save review photo URL if provided (after rating the reservation)
+        if (!result.error && review_photo_url) {
+          await db
+            .from('reservas')
+            .update({ review_photo_url: String(review_photo_url) })
+            .eq('id', reserva_id);
+        }
       }
         break;
       case 'reprogramar':

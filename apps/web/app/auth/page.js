@@ -111,7 +111,7 @@ function AuthForm() {
         setTimeout(() => router.push(destino), 1500);
       }
     } catch (err) {
-      console.error(err);
+      if (process.env.NODE_ENV === 'development') console.error(err);
       let msg = err.message || "Ocurrió un error en la autenticación";
       if (err.status === 500 || msg.includes('unexpected_failure')) {
         msg = "Error interno del servidor. Verifica que el correo no esté ya registrado o intenta más tarde.";

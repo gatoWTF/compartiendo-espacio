@@ -1,0 +1,56 @@
+=============================================================
+PARKINGS TOGETHER — REPOSITORIOS DE COMPONENTES
+=============================================================
+
+REPOSITORIO PRINCIPAL
+URL: https://github.com/jeffplop/Parkings-Together
+Descripción: Monorepo principal del proyecto Parkings Together.
+             Contiene frontend, BFF, microservicios y paquetes compartidos.
+
+COMPONENTES
+-----------
+
+1. FRONTEND + BFF (Backend For Frontend)
+   Carpeta: apps/web
+   URL: https://github.com/jeffplop/Parkings-Together/tree/master/apps/web
+   Descripción: Aplicación Next.js 14 que actúa como frontend PWA y BFF.
+                Incluye API routes para reservas, mapas, pagos y autenticación.
+                Desplegado en: https://parkings-web.vercel.app
+
+2. MICROSERVICIO DE MAPAS (ms-mapas)
+   Carpeta: apps/ms-mapas
+   URL: https://github.com/jeffplop/Parkings-Together/tree/master/apps/ms-mapas
+   Descripción: Microservicio REST para búsqueda y gestión de estacionamientos.
+                Implementa patrón Controller→Service→Repository.
+                Expone: GET/POST/PATCH/DELETE /api/v1/search
+
+3. MICROSERVICIO DE RESERVAS (ms-reservas)
+   Carpeta: apps/ms-reservas
+   URL: https://github.com/jeffplop/Parkings-Together/tree/master/apps/ms-reservas
+   Descripción: Microservicio de reservas con patrón Saga/CQRS.
+                Implementa transacciones compensatorias para consistencia.
+                Expone: POST /api/v1/reserve
+
+4. MICROSERVICIO DE AUTENTICACIÓN (auth)
+   Carpeta: apps/auth
+   URL: https://github.com/jeffplop/Parkings-Together/tree/master/apps/auth
+   Descripción: Microservicio de autenticación y registro de usuarios.
+                Patrón MVC con capas Controller→Service→Repository.
+                Expone: POST /api/v1/auth/login, POST /api/v1/auth/register
+
+5. PAQUETE COMPARTIDO (supabase-db)
+   Carpeta: packages/supabase-db
+   URL: https://github.com/jeffplop/Parkings-Together/tree/master/packages/supabase-db
+   Descripción: Paquete NPM compartido con cliente Supabase (patrón Singleton).
+                Usado por todos los microservicios y el BFF.
+
+RAMA DE DESARROLLO
+------------------
+Branch activo: claude/inspiring-rubin-WVJbv
+PR más reciente: https://github.com/jeffplop/Parkings-Together/pull/13
+
+DESPLIEGUE
+----------
+URL producción: https://parkings-web.vercel.app
+Plataforma: Vercel (CI/CD automático desde master)
+Base de datos: Supabase (PostgreSQL 17 con PostGIS)

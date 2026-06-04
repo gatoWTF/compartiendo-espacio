@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '@parkings/supabase-db';
+import { api } from '../lib/api';
 
 const LogoSVG = ({ className }) => (
   <svg 
@@ -54,6 +55,7 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
+  const [favCount, setFavCount] = useState(0);
   const pathname = usePathname();
   const router = useRouter();
   const dropdownRef = useRef(null);
@@ -84,6 +86,14 @@ export default function Navbar() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // ── Favorites count ──
+  useEffect(() => {
+    if (!user) { setFavCount(0); return; }
+    api.favoritos.listar().then(res => {
+      if (res.success) setFavCount((res.data || []).length);
+    }).catch(() => {});
+  }, [user]);
 
   // ── Realtime pending reservations count ──
   useEffect(() => {
@@ -223,6 +233,15 @@ export default function Navbar() {
                         {pendingCount > 0 && (
                           <span style={{ marginLeft: 'auto', background: '#ef4444', color: 'white', borderRadius: '10px', fontSize: '0.7rem', padding: '1px 7px', fontWeight: 900 }}>
                             {pendingCount}
+                          </span>
+                        )}
+                      </Link>
+                      <Link href="/profile?tab=favoritos" className="nav-link-cyber dropdown-item" onClick={closeMenus} style={{ position: 'relative' }}>
+                        <i className="fa-solid fa-star dropdown-icon"></i>
+                        <span>Favoritos</span>
+                        {favCount > 0 && (
+                          <span style={{ marginLeft: 'auto', background: '#f59e0b', color: '#020617', borderRadius: '10px', fontSize: '0.7rem', padding: '1px 7px', fontWeight: 900 }}>
+                            {favCount}
                           </span>
                         )}
                       </Link>
