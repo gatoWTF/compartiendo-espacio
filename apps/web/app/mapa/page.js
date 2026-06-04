@@ -397,6 +397,12 @@ export default function MapaPageContainer() {
                   ))}
                 </div>
               )}
+              {state.selectedSpot.descripcion && (
+                <p style={{color:'#94a3b8',fontSize:'0.85rem',lineHeight:1.6,margin:'0 0 14px',fontStyle:'italic'}}>
+                  <i className="fa-solid fa-quote-left" style={{color:'#3b82f6',marginRight:'6px',fontSize:'0.7rem'}}></i>
+                  {state.selectedSpot.descripcion}
+                </p>
+              )}
               <p className="res-row">
                 <i className="fa-solid fa-user-tie" style={{ color: '#64748b', width: '16px' }}></i>
                 <span style={{ color: '#cbd5e1' }}>{state.selectedSpot.arrendador || 'Estacionamiento compartido'}</span>

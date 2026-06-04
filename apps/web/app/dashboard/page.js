@@ -237,7 +237,7 @@ export default function DashboardPage() {
 
       if (result.success && result.data) {
         setMyParkings(prev => [result.data, ...prev]);
-        setNombre(''); setDireccion(''); setComuna(''); setLat(''); setLng(''); setTotalSpots(1); setEsPmr(false);
+        setNombre(''); setDireccion(''); setDescripcion(''); setComuna(''); setLat(''); setLng(''); setTotalSpots(1); setEsPmr(false);
         setPrecioHora(''); setPricePerMinute(''); setPricePerDay('');
         setAllowedVehicleTypes(['car']);
         setPhotos([]);
@@ -402,6 +402,40 @@ export default function DashboardPage() {
         
       </div>
 
+      {/* ANALYTICS PANEL */}
+      {session?.user?.rol === 'arrendador' && (
+        <div className="analytics-panel">
+          <div className="analytics-card">
+            <div className="analytics-icon blue"><i className="fa-solid fa-square-parking"></i></div>
+            <div className="analytics-data">
+              <span className="analytics-label">PLAZAS ACTIVAS</span>
+              <span className="analytics-value">{myParkings.filter(p=>p.activo!==false).length}</span>
+            </div>
+          </div>
+          <div className="analytics-card">
+            <div className="analytics-icon green"><i className="fa-solid fa-calendar-check"></i></div>
+            <div className="analytics-data">
+              <span className="analytics-label">RESERVAS HOY</span>
+              <span className="analytics-value">{reservasRecibidas.filter(r=>{const d=new Date(r.created_at);const h=new Date();return d.getDate()===h.getDate()&&d.getMonth()===h.getMonth()}).length}</span>
+            </div>
+          </div>
+          <div className="analytics-card">
+            <div className="analytics-icon amber"><i className="fa-solid fa-clock"></i></div>
+            <div className="analytics-data">
+              <span className="analytics-label">PENDIENTES</span>
+              <span className="analytics-value">{reservasRecibidas.filter(r=>r.estado==='pendiente').length}</span>
+            </div>
+          </div>
+          <div className="analytics-card">
+            <div className="analytics-icon purple"><i className="fa-solid fa-peso-sign"></i></div>
+            <div className="analytics-data">
+              <span className="analytics-label">INGRESOS (MES)</span>
+              <span className="analytics-value">${reservasRecibidas.filter(r=>r.estado==='completada'&&new Date(r.created_at).getMonth()===new Date().getMonth()).reduce((acc,r)=>acc+Number(r.precio_total||0),0).toLocaleString('es-CL')}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* TOAST SYSTEM */}
       {toast && (
         <div className={`toast-notification ${toast.type}`}>
@@ -429,6 +463,20 @@ export default function DashboardPage() {
               <div className="input-group">
                 <i className="fa-solid fa-signature icon"></i>
                 <input type="text" placeholder="Nombre de la Plaza" value={editNombre} onChange={e => setEditNombre(e.target.value)} required />
+              </div>
+              {/* Descripcion */}
+              <textarea
+                placeholder="Descripción (opcional)"
+                value={editDescripcion}
+                onChange={e => setEditDescripcion(e.target.value)}
+                rows={2}
+                maxLength={500}
+                style={{width:'100%',background:'rgba(0,0,0,0.3)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'12px',color:'white',padding:'12px 14px',fontSize:'0.9rem',resize:'vertical',fontFamily:'inherit',outline:'none',boxSizing:'border-box'}}
+              />
+              {/* Direccion */}
+              <div className="input-group">
+                <i className="fa-solid fa-map-pin icon"></i>
+                <input type="text" placeholder="Dirección (opcional)" value={editDireccion} onChange={e => setEditDireccion(e.target.value)} />
               </div>
               {/* Cupos y PMR */}
               <div style={{ display: 'flex', gap: '12px' }}>
@@ -604,6 +652,17 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 
+                <div className="form-group">
+                  <label>Descripción</label>
+                  <textarea
+                    placeholder="Describe tu estacionamiento: características, acceso, instrucciones de llegada…"
+                    value={descripcion}
+                    onChange={e => setDescripcion(e.target.value)}
+                    rows={3}
+                    maxLength={500}
+                    style={{width:'100%',background:'rgba(0,0,0,0.3)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'12px',color:'white',padding:'14px',fontSize:'0.9rem',resize:'vertical',fontFamily:'inherit',outline:'none',boxSizing:'border-box'}}
+                  />
+                </div>
                 <div className="checkbox-pmr">
                   <input type="checkbox" id="pmr-check" checked={esPmr} onChange={e => setEsPmr(e.target.checked)} style={{width: '20px', height: '20px', accentColor: '#38bdf8'}} />
                   <label htmlFor="pmr-check" style={{display: 'flex', flexDirection: 'column', cursor: 'pointer'}}>
@@ -958,6 +1017,19 @@ export default function DashboardPage() {
         .disp-pill.green { background: rgba(16,185,129,0.12); color: #34d399; }
         .disp-pill.red { background: rgba(239,68,68,0.12); color: #f87171; }
         
+        .analytics-panel { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+        .analytics-card { display: flex; align-items: center; gap: 14px; padding: 18px 20px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; }
+        .analytics-icon { width: 46px; height: 46px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
+        .analytics-icon.blue { background: rgba(59,130,246,0.12); color: #60a5fa; }
+        .analytics-icon.green { background: rgba(16,185,129,0.12); color: #10b981; }
+        .analytics-icon.amber { background: rgba(245,158,11,0.12); color: #f59e0b; }
+        .analytics-icon.purple { background: rgba(139,92,246,0.12); color: #a78bfa; }
+        .analytics-data { display: flex; flex-direction: column; gap: 2px; }
+        .analytics-label { font-size: 0.65rem; color: #64748b; font-weight: 700; letter-spacing: 1px; }
+        .analytics-value { font-size: 1.3rem; color: #f8fafc; font-weight: 900; }
+        @media (max-width: 768px) { .analytics-panel { grid-template-columns: 1fr 1fr; } }
+        @media (max-width: 480px) { .analytics-panel { grid-template-columns: 1fr; } }
+
         .dashboard-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 30px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 20px; flex-wrap: wrap; gap: 20px; }
         .header-titles h2 { font-size: 2.2rem; color: #3b82f6; margin: 0; font-weight: 900; letter-spacing: -1px; }
         .header-titles p { color: #94a3b8; margin: 5px 0 0 0; font-size: 0.95rem; font-weight: 600; }
