@@ -44,6 +44,7 @@ const LogoSVG = ({ className }) => (
 const NAV_ITEMS = [
   { href: '/', label: 'Inicio', icon: 'fa-house' },
   { href: '/mapa', label: 'Buscar Plaza', icon: 'fa-map-location-dot' },
+  { href: '/ranking', label: 'Ranking', icon: 'fa-trophy' },
 ];
 
 const AUTH_NAV_ITEMS = [
@@ -196,6 +197,12 @@ export default function Navbar() {
 
           <div className="nav-divider"></div>
 
+          {/* ═══ PREMIUM CTA ═══ */}
+          <Link href="/premium" className={`premium-link ${isActive('/premium') ? 'active' : ''}`} onClick={closeMenus}>
+            <i className="fa-solid fa-crown"></i>
+            <span>Premium</span>
+          </Link>
+
           {/* ═══ AUTH / USER SECTION ═══ */}
           <div className="auth-container">
             {!user ? (
@@ -249,7 +256,11 @@ export default function Navbar() {
                         <i className="fa-solid fa-chart-line dropdown-icon"></i>
                         <span>Panel de Control</span>
                       </Link>
-                      
+                      <Link href="/premium" className="nav-link-cyber dropdown-item" onClick={closeMenus} style={{ color: '#fbbf24' }}>
+                        <i className="fa-solid fa-crown dropdown-icon" style={{ color: '#fbbf24' }}></i>
+                        <span>Hazte Premium</span>
+                      </Link>
+
                       <div className="dropdown-divider"></div>
                       
                       <button className="nav-link-cyber dropdown-item danger-item" onClick={handleLogout}>
@@ -314,6 +325,30 @@ export default function Navbar() {
           height: 30px;
           background: var(--glass-border);
           margin: 0 16px;
+        }
+
+        /* ── PREMIUM CTA ── */
+        .premium-link {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 9px 16px;
+          margin-right: 12px;
+          border-radius: 12px;
+          font-weight: 800;
+          font-size: 0.9rem;
+          color: #fbbf24;
+          text-decoration: none;
+          background: rgba(245, 158, 11, 0.1);
+          border: 1px solid rgba(245, 158, 11, 0.3);
+          transition: all 0.25s;
+          white-space: nowrap;
+        }
+        .premium-link:hover, .premium-link.active {
+          background: linear-gradient(135deg, #f59e0b, #d97706);
+          color: white;
+          box-shadow: 0 6px 18px rgba(245, 158, 11, 0.4);
+          transform: translateY(-1px);
         }
 
         /* ── USER & DROPDOWN ── */
@@ -463,6 +498,12 @@ export default function Navbar() {
           }
           .auth-container {
             width: 100%;
+          }
+          .premium-link {
+            width: 100%;
+            justify-content: center;
+            margin-right: 0;
+            margin-bottom: 10px;
           }
           .btn-cyber-primary {
             width: 100%;

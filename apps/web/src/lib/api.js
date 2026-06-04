@@ -166,6 +166,19 @@ export const api = {
         body: JSON.stringify({ action: 'calificar', reserva_id, calificacion, comentario, ...(photoUrl ? { review_photo_url: photoUrl } : {}) }),
       }),
   },
+  premium: {
+    // Plan actual del usuario autenticado.
+    estado: async () =>
+      fetchWithTimeout(`/api/premium`, { headers: await authHeaders() }),
+
+    // Cambia de plan (flujo de pago simulado en la demo).
+    suscribir: async (plan, ciclo = 'mensual') =>
+      fetchWithTimeout(`/api/premium`, {
+        method: 'POST',
+        headers: await authHeaders(),
+        body: JSON.stringify({ plan, ciclo }),
+      }),
+  },
   favoritos: {
     listar: async () =>
       fetchWithTimeout(`${FAVORITOS_URL}`, { headers: await authHeaders() }),
