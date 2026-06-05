@@ -10,6 +10,7 @@
     "test:unit": "jest"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.100.1",
     "@hookform/resolvers": "^5.4.0",
     "@parkings/supabase-db": "^1.0.0",
     "leaflet": "^1.9.4",
