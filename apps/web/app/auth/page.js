@@ -43,6 +43,7 @@ function AuthForm() {
   const [apellido,    setApellido]    = useState('');
   const [telefono,    setTelefono]    = useState('');
   const [tipoVeh,     setTipoVeh]     = useState('auto');
+  const [patente,     setPatente]     = useState('');
   const [empresa,     setEmpresa]     = useState('');
   const [email,       setEmail]       = useState('');
   const [password,    setPassword]    = useState('');
@@ -65,7 +66,7 @@ function AuthForm() {
 
   const resetRegister = () => {
     setStep(1); setRol('cliente'); setNombre(''); setApellido('');
-    setTelefono(''); setTipoVeh('auto'); setEmpresa('');
+    setTelefono(''); setTipoVeh('auto'); setPatente(''); setEmpresa('');
     setEmail(''); setPassword(''); setErrors({});
   };
 
@@ -137,7 +138,7 @@ function AuthForm() {
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, nombre, apellido, rol, telefono, tipo_vehiculo: tipoVeh, empresa }),
+        body: JSON.stringify({ email, password, nombre, apellido, rol, telefono, tipo_vehiculo: tipoVeh, patente: patente.trim().toUpperCase() || null, empresa }),
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || 'Error al crear cuenta.');
@@ -275,19 +276,41 @@ function AuthForm() {
             </div>
 
             {rol === 'cliente' && (
-              <div className="vehicle-selector">
-                <p className="field-label">¿Cuál es tu vehículo principal?</p>
-                <div className="vehicle-grid">
-                  {VEHICLE_TYPES.map(v => (
-                    <button key={v.value} type="button"
-                      className={`vehicle-option ${tipoVeh === v.value ? 'active' : ''}`}
-                      onClick={() => setTipoVeh(v.value)}>
-                      <i className={`fa-solid ${v.icon}`}></i>
-                      <span>{v.label}</span>
-                    </button>
-                  ))}
+              <>
+                <div className="vehicle-selector">
+                  <p className="field-label">¿Cuál es tu vehículo principal?</p>
+                  <div className="vehicle-grid">
+                    {VEHICLE_TYPES.map(v => (
+                      <button key={v.value} type="button"
+                        className={`vehicle-option ${tipoVeh === v.value ? 'active' : ''}`}
+                        onClick={() => { setTipoVeh(v.value); setPatente(''); }}>
+                        <i className={`fa-solid ${v.icon}`}></i>
+                        <span>{v.label}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+                <div className="input-wrap">
+                  <i className="fa-solid fa-id-card icon"></i>
+                  <input
+                    type="text"
+                    placeholder={
+                      tipoVeh === 'auto' ? 'Patente (ej: ABCD12)' :
+                      tipoVeh === 'moto' ? 'Patente moto (opcional)' :
+                      'Patente / matrícula (opcional)'
+                    }
+                    value={patente}
+                    onChange={e => setPatente(e.target.value.toUpperCase())}
+                    maxLength={8}
+                    style={{ textTransform: 'uppercase', letterSpacing: '2px', fontWeight: 700 }}
+                  />
+                  {tipoVeh !== 'auto' && (
+                    <span style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', fontSize: '0.7rem', color: '#64748b', pointerEvents: 'none' }}>
+                      opcional
+                    </span>
+                  )}
+                </div>
+              </>
             )}
 
             {rol === 'arrendador' && (

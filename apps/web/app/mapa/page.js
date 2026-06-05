@@ -1,16 +1,38 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useMapRadar } from '../../src/hooks/useMapRadar';
 import { api } from '../../src/lib/api';
 import { supabase } from '@parkings/supabase-db';
 import dynamic from 'next/dynamic';
+import { useSearchParams } from 'next/navigation';
 import { REGIONES, detectarRegion } from '../../src/lib/comunas-chile';
 
 const Map = dynamic(() => import('../../src/components/Map'), { ssr: false });
 const ParkingSelector = dynamic(() => import('../../src/components/ParkingSelector'), { ssr: false });
 
-export default function MapaPageContainer() {
+function MapaPageInner() {
   const { state, actions } = useMapRadar();
+  const searchParams = useSearchParams();
+
+  // Si venimos del ranking con ?id=&lat=&lng= seleccionamos ese estacionamiento
+  useEffect(() => {
+    const id = searchParams.get('id');
+    const lat = parseFloat(searchParams.get('lat'));
+    const lng = parseFloat(searchParams.get('lng'));
+    if (!id) return;
+    // Esperar a que los parkings estén cargados y luego seleccionar el correcto
+    const trySelect = (retries = 0) => {
+      const found = state.parkings?.find(p => String(p.id) === String(id));
+      if (found) {
+        actions.setSelectedSpot(found);
+        if (!isNaN(lat) && !isNaN(lng)) actions.setLocationOverride({ lat, lng });
+      } else if (retries < 10) {
+        setTimeout(() => trySelect(retries + 1), 300);
+      }
+    };
+    trySelect();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
   const [filters, setFilters] = useState({ p2p: false, pmr: false, vehicle: null });
   const [localRadius, setLocalRadius] = useState(state.radius);
   const [panelCollapsed, setPanelCollapsed] = useState(false);
@@ -936,5 +958,13 @@ export default function MapaPageContainer() {
         }
       `}</style>
     </div>
+  );
+}
+
+export default function MapaPageContainer() {
+  return (
+    <Suspense>
+      <MapaPageInner />
+    </Suspense>
   );
 }
