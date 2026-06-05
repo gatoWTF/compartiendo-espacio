@@ -3,79 +3,12 @@ import { useState, useRef, useEffect } from 'react';
 
 const BOT_NAME = 'Dareko IA';
 
-const FAQ = [
-  {
-    keywords: ['reserva', 'reservar', 'reservación', 'booking'],
-    answer: '¡Reservar es muy fácil! Ve al **Mapa**, selecciona un estacionamiento disponible y haz clic en "Reservar". Elige el horario, confirma y ¡listo! Recibirás la confirmación al instante.',
-  },
-  {
-    keywords: ['pago', 'pagar', 'precio', 'costo', 'cobro', 'tarifa'],
-    answer: 'El pago se gestiona directamente con el arrendador. El precio se muestra en $/hora en cada estacionamiento. Los planes Premium eliminan la comisión de servicio.',
-  },
-  {
-    keywords: ['cancelar', 'cancelación', 'anular'],
-    answer: 'Puedes cancelar una reserva desde tu **Dashboard → Mis Reservas** antes de la hora de inicio. Las políticas de reembolso dependen de cada arrendador.',
-  },
-  {
-    keywords: ['premium', 'plan', 'suscripción', 'upgrade', 'mejorar'],
-    answer: 'Con **Parkings Together Premium** obtienes: sin comisiones de servicio, reservas hasta 30 días de anticipación, alertas de disponibilidad y soporte prioritario. Ve a la sección **Premium** para ver los planes.',
-  },
-  {
-    keywords: ['arrendador', 'publicar', 'ofrecer', 'estacionamiento mío'],
-    answer: 'Para publicar tu estacionamiento, regístrate como **Arrendador**, ve a tu Dashboard y haz clic en "Publicar estacionamiento". Puedes agregar fotos, precio/hora, tipo de vehículo y horarios.',
-  },
-  {
-    keywords: ['cuenta', 'perfil', 'contraseña', 'email', 'correo'],
-    answer: 'Puedes editar tu perfil y cambiar tu contraseña desde el menú de usuario (ícono superior derecho) → **Mi cuenta**.',
-  },
-  {
-    keywords: ['vehiculo', 'vehículo', 'auto', 'moto', 'bicicleta', 'scooter'],
-    answer: 'Al registrarte puedes especificar tu tipo de vehículo y patente. Esto nos ayuda a mostrarte estacionamientos compatibles. Puedes actualizarlo en tu perfil.',
-  },
-  {
-    keywords: ['patente', 'placa', 'matricula', 'matrícula'],
-    answer: 'La patente es el número identificador de tu vehículo (ej: ABCD12 para autos en Chile). Para bicicletas, motos y scooters es opcional.',
-  },
-  {
-    keywords: ['ranking', 'calificación', 'estrellas', 'reseña', 'opinión'],
-    answer: 'El Ranking muestra los estacionamientos mejor evaluados por la comunidad. Puedes dejar tu reseña tras completar una reserva en el **Dashboard → Mis Reservas**.',
-  },
-  {
-    keywords: ['mapa', 'ubicación', 'gps', 'cerca', 'cercanía'],
-    answer: 'El **Mapa** usa tu ubicación GPS para mostrarte estacionamientos cercanos en tiempo real. Puedes ajustar el radio de búsqueda (0.5 km a 5 km) en el panel de control.',
-  },
-  {
-    keywords: ['favorito', 'guardar', 'lista'],
-    answer: 'Guarda tus estacionamientos favoritos haciendo clic en el ícono de corazón en el mapa o en el ranking. Accede a ellos desde el ícono de corazón en la barra superior.',
-  },
-  {
-    keywords: ['contacto', 'humano', 'persona', 'asesor', 'agente'],
-    answer: 'Para hablar con un asesor humano, los usuarios **Premium** tienen soporte prioritario 24/7. También puedes escribirnos a soporte@parkingstogether.cl',
-  },
-  {
-    keywords: ['hola', 'hi', 'buenas', 'saludos', 'hey'],
-    answer: '¡Hola! Soy Dareko, tu asistente virtual. ¿En qué te puedo ayudar hoy? Puedes preguntarme sobre reservas, pagos, tu cuenta o cualquier duda sobre la plataforma.',
-  },
-  {
-    keywords: ['gracias', 'thanks', 'perfecto', 'genial', 'excelente'],
-    answer: '¡De nada! 😊 Si tienes más dudas no dudes en preguntar. ¡Que disfrutes de tu parking!',
-  },
-];
-
 const QUICK_QUESTIONS = [
   '¿Cómo reservo un estacionamiento?',
   '¿Cuáles son los planes Premium?',
   '¿Cómo publico mi estacionamiento?',
   '¿Cómo cancelo una reserva?',
 ];
-
-function findAnswer(text) {
-  const lower = text.toLowerCase();
-  for (const item of FAQ) {
-    if (item.keywords.some(k => lower.includes(k))) return item.answer;
-  }
-  return 'No encontré una respuesta exacta para eso. Te recomiendo revisar el **Dashboard** o escribirnos a soporte@parkingstogether.cl. Si eres usuario Premium, tienes acceso a soporte prioritario.';
-}
 
 function renderMarkdown(text) {
   return text
@@ -84,40 +17,60 @@ function renderMarkdown(text) {
 }
 
 export default function SupportChat() {
-  const [open, setOpen]       = useState(false);
-  const [msgs, setMsgs]       = useState([
-    { from: 'bot', text: '¡Hola! 👋 Soy **Dareko**, tu asistente de Parkings Together. ¿En qué te puedo ayudar?', time: new Date() },
+  const [open, setOpen]     = useState(false);
+  const [msgs, setMsgs]     = useState([
+    { role: 'assistant', text: '¡Hola! 👋 Soy **Dareko**, tu asistente de Parkings Together. ¿En qué te puedo ayudar?', time: new Date() },
   ]);
-  const [input, setInput]     = useState('');
-  const [typing, setTyping]   = useState(false);
-  const [unread, setUnread]   = useState(0);
-  const bottomRef             = useRef(null);
-  const inputRef              = useRef(null);
+  const [input, setInput]   = useState('');
+  const [loading, setLoading] = useState(false);
+  const [unread, setUnread] = useState(0);
+  const bottomRef           = useRef(null);
+  const inputRef            = useRef(null);
 
   useEffect(() => {
-    if (open) {
-      setUnread(0);
-      setTimeout(() => inputRef.current?.focus(), 100);
-    }
+    if (open) { setUnread(0); setTimeout(() => inputRef.current?.focus(), 100); }
   }, [open]);
 
   useEffect(() => {
     if (open) bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [msgs, open]);
 
-  const sendMessage = (text) => {
-    if (!text.trim()) return;
-    const userMsg = { from: 'user', text: text.trim(), time: new Date() };
-    setMsgs(prev => [...prev, userMsg]);
-    setInput('');
-    setTyping(true);
+  const sendMessage = async (text) => {
+    const trimmed = text.trim();
+    if (!trimmed || loading) return;
 
-    setTimeout(() => {
-      const answer = findAnswer(text);
-      setMsgs(prev => [...prev, { from: 'bot', text: answer, time: new Date() }]);
-      setTyping(false);
+    const userMsg = { role: 'user', text: trimmed, time: new Date() };
+    const newMsgs = [...msgs, userMsg];
+    setMsgs(newMsgs);
+    setInput('');
+    setLoading(true);
+
+    try {
+      // Build API-compatible history (exclude initial greeting from history)
+      const history = newMsgs
+        .filter(m => !(m.role === 'assistant' && newMsgs.indexOf(m) === 0))
+        .map(m => ({ role: m.role, content: m.text }));
+
+      const res = await fetch('/api/support/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: history }),
+      });
+
+      const data = await res.json();
+      const replyText = data.reply || 'No pude procesar tu consulta. Por favor intenta de nuevo.';
+
+      setMsgs(prev => [...prev, { role: 'assistant', text: replyText, time: new Date() }]);
       if (!open) setUnread(u => u + 1);
-    }, 600 + Math.random() * 400);
+    } catch {
+      setMsgs(prev => [...prev, {
+        role: 'assistant',
+        text: 'Hubo un problema de conexión. Por favor intenta de nuevo o escríbenos a **soporte@parkingstogether.cl**',
+        time: new Date(),
+      }]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleKey = (e) => {
@@ -134,26 +87,28 @@ export default function SupportChat() {
 
       {/* CHAT WINDOW */}
       {open && (
-        <div className="chat-window">
+        <div className="chat-window" role="dialog" aria-label="Chat de soporte Dareko IA">
           {/* Header */}
           <div className="chat-header">
             <div className="chat-avatar"><i className="fa-solid fa-robot"></i></div>
             <div className="chat-header-info">
               <strong>{BOT_NAME}</strong>
-              <span className="chat-status"><span className="dot"></span> En línea</span>
+              <span className="chat-status"><span className="dot"></span> En línea · IA</span>
             </div>
-            <button className="chat-close" onClick={() => setOpen(false)}><i className="fa-solid fa-xmark"></i></button>
+            <button className="chat-close" onClick={() => setOpen(false)} aria-label="Cerrar chat">
+              <i className="fa-solid fa-xmark"></i>
+            </button>
           </div>
 
           {/* Messages */}
           <div className="chat-messages">
             {msgs.map((m, i) => (
-              <div key={i} className={`chat-msg ${m.from}`}>
-                {m.from === 'bot' && <div className="msg-avatar"><i className="fa-solid fa-robot"></i></div>}
+              <div key={i} className={`chat-msg ${m.role === 'user' ? 'user' : 'bot'}`}>
+                {m.role !== 'user' && <div className="msg-avatar"><i className="fa-solid fa-robot"></i></div>}
                 <div className="msg-bubble" dangerouslySetInnerHTML={{ __html: renderMarkdown(m.text) }} />
               </div>
             ))}
-            {typing && (
+            {loading && (
               <div className="chat-msg bot">
                 <div className="msg-avatar"><i className="fa-solid fa-robot"></i></div>
                 <div className="msg-bubble typing"><span></span><span></span><span></span></div>
@@ -162,8 +117,8 @@ export default function SupportChat() {
             <div ref={bottomRef} />
           </div>
 
-          {/* Quick questions */}
-          {msgs.length <= 2 && (
+          {/* Quick questions (only shown at start) */}
+          {msgs.length <= 2 && !loading && (
             <div className="chat-quick">
               {QUICK_QUESTIONS.map((q, i) => (
                 <button key={i} className="quick-btn" onClick={() => sendMessage(q)}>{q}</button>
@@ -180,10 +135,20 @@ export default function SupportChat() {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKey}
-              maxLength={300}
+              maxLength={500}
+              disabled={loading}
+              aria-label="Mensaje para Dareko"
             />
-            <button className="send-btn" onClick={() => sendMessage(input)} disabled={!input.trim()}>
-              <i className="fa-solid fa-paper-plane"></i>
+            <button
+              className="send-btn"
+              onClick={() => sendMessage(input)}
+              disabled={!input.trim() || loading}
+              aria-label="Enviar mensaje"
+            >
+              {loading
+                ? <i className="fa-solid fa-circle-notch fa-spin"></i>
+                : <i className="fa-solid fa-paper-plane"></i>
+              }
             </button>
           </div>
         </div>
@@ -376,6 +341,7 @@ export default function SupportChat() {
         }
         .chat-input-row input:focus { border-color: #3b82f6; }
         .chat-input-row input::placeholder { color: #475569; }
+        .chat-input-row input:disabled { opacity: 0.6; cursor: not-allowed; }
         .send-btn {
           width: 40px;
           height: 40px;
