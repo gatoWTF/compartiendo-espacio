@@ -426,7 +426,7 @@ function MapaPageInner() {
       )}
 
       {/* ── ÁREA DEL MAPA ── */}
-      <div className="map-area" style={{ position: 'relative' }}>
+      <div className="map-area">
         <Map
           location={state.userLoc}
           isLoading={state.loading}
