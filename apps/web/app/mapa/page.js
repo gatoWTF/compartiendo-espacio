@@ -90,7 +90,7 @@ function MapaPageInner() {
   const [sheetHeight, setSheetHeight] = useState(null); // null = CSS default
 
   const onSheetTouchStart = (e) => {
-    if (e.target.closest('.reviews-body, .spot-photos')) return; // don't intercept scrollable areas
+    if (e.target.closest('.reviews-body') || e.target.closest('.spot-photos')) return;
     dragStartY.current = e.touches[0].clientY;
     dragStartH.current = sheetRef.current?.offsetHeight ?? 0;
   };
