@@ -417,6 +417,14 @@ function MapaPageInner() {
         </div>
       </div>
 
+      {/* ── Pill flotante: estacionamientos encontrados ── */}
+      {!state.loading && state.parkings.length > 0 && (
+        <div style={{ position: 'absolute', top: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 999, background: 'rgba(15,23,42,0.88)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '99px', padding: '7px 18px', color: '#e2e8f0', fontSize: '0.8rem', fontWeight: 700, pointerEvents: 'none', whiteSpace: 'nowrap', boxShadow: '0 4px 20px rgba(0,0,0,0.4)' }}>
+          <i className="fa-solid fa-square-parking" style={{ color: '#3b82f6', marginRight: 8 }}></i>
+          {state.parkings.length} estacionamiento{state.parkings.length !== 1 ? 's' : ''} en el área
+        </div>
+      )}
+
       {/* ── ÁREA DEL MAPA ── */}
       <div className="map-area" style={{ position: 'relative' }}>
         <Map
