@@ -258,20 +258,35 @@ function AuthForm() {
               {rol === 'cliente' ? '👤 Tus datos personales' : '🏢 Datos del arrendador'}
             </p>
             <div className="name-row">
-              <div className="input-wrap">
-                <i className="fa-solid fa-user icon"></i>
-                <input type="text" placeholder="Nombre" value={nombre} onChange={e => setNombre(e.target.value)} />
+              <div className="input-field-row">
+                <div className="input-wrap">
+                  <i className="fa-solid fa-user icon"></i>
+                  <input type="text" placeholder="Nombre" value={nombre}
+                    autoComplete="given-name"
+                    onChange={e => setNombre(e.target.value)}
+                    onInput={e => setNombre(e.target.value)} />
+                </div>
                 {errors.nombre && <p className="error-msg">{errors.nombre}</p>}
               </div>
-              <div className="input-wrap">
-                <i className="fa-solid fa-user icon"></i>
-                <input type="text" placeholder="Apellido" value={apellido} onChange={e => setApellido(e.target.value)} />
+              <div className="input-field-row">
+                <div className="input-wrap">
+                  <i className="fa-solid fa-user icon"></i>
+                  <input type="text" placeholder="Apellido" value={apellido}
+                    autoComplete="family-name"
+                    onChange={e => setApellido(e.target.value)}
+                    onInput={e => setApellido(e.target.value)} />
+                </div>
                 {errors.apellido && <p className="error-msg">{errors.apellido}</p>}
               </div>
             </div>
-            <div className="input-wrap">
-              <i className="fa-solid fa-phone icon"></i>
-              <input type="tel" placeholder={rol === 'arrendador' ? 'Teléfono de contacto' : 'Teléfono (opcional)'} value={telefono} onChange={e => setTelefono(e.target.value)} />
+            <div className="input-field-row">
+              <div className="input-wrap">
+                <i className="fa-solid fa-phone icon"></i>
+                <input type="tel" placeholder={rol === 'arrendador' ? 'Teléfono de contacto' : 'Teléfono (opcional)'}
+                  value={telefono} autoComplete="tel"
+                  onChange={e => setTelefono(e.target.value)}
+                  onInput={e => setTelefono(e.target.value)} />
+              </div>
               {errors.telefono && <p className="error-msg">{errors.telefono}</p>}
             </div>
 
@@ -305,7 +320,7 @@ function AuthForm() {
                     style={{ textTransform: 'uppercase', letterSpacing: '2px', fontWeight: 700 }}
                   />
                   {tipoVeh !== 'auto' && (
-                    <span style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', fontSize: '0.7rem', color: '#64748b', pointerEvents: 'none' }}>
+                    <span style={{ position: 'absolute', right: 14, top: 17, fontSize: '0.7rem', color: '#64748b', pointerEvents: 'none' }}>
                       opcional
                     </span>
                   )}
@@ -411,17 +426,18 @@ const sharedStyles = `
 
   /* Inputs */
   .auth-form { display: flex; flex-direction: column; gap: 0; }
-  .input-wrap { position: relative; margin-bottom: 16px; text-align: left; }
-  .input-wrap .icon { position: absolute; left: 18px; top: 50%; transform: translateY(-50%); color: #64748b; font-size: 1rem; pointer-events: none; }
+  .input-wrap { position: relative; margin-bottom: 4px; text-align: left; }
+  .input-field-row { margin-bottom: 14px; }
+  .input-wrap .icon { position: absolute; left: 18px; top: 17px; color: #64748b; font-size: 1rem; pointer-events: none; z-index: 1; }
   .input-wrap input { width: 100%; box-sizing: border-box; padding: 16px 44px 16px 50px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; color: white; outline: none; transition: 0.3s; font-size: 0.95rem; }
   .input-wrap input::placeholder { color: #475569; }
   .input-wrap input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.12); background: rgba(0,0,0,0.6); }
-  .pw-toggle { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #64748b; cursor: pointer; padding: 4px; font-size: 0.95rem; }
+  .pw-toggle { position: absolute; right: 16px; top: 17px; background: none; border: none; color: #64748b; cursor: pointer; padding: 4px; font-size: 0.95rem; }
   .pw-toggle:hover { color: #94a3b8; }
   .error-msg { color: #fca5a5; font-size: 0.75rem; margin: 4px 0 0 8px; }
 
   /* Name row */
-  .name-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .name-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
 
   /* Role cards */
   .role-cards { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
