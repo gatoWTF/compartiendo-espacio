@@ -39,6 +39,15 @@ function distanciaKm(lat1, lng1, lat2, lng2) {
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
+
+    // Detalle de un estacionamiento puntual por id (para la página de perfil).
+    const id = searchParams.get('id');
+    if (id) {
+      const { data, error } = await supabase.from('estacionamientos').select('*').eq('id', id).single();
+      if (error) return NextResponse.json({ success: false, error: error.message, data: null }, { status: 404 });
+      return NextResponse.json({ success: true, data }, { status: 200 });
+    }
+
     const userId = searchParams.get('userId');
     const lat = parseFloat(searchParams.get('lat'));
     const lng = parseFloat(searchParams.get('lng'));
@@ -225,6 +234,7 @@ export async function PATCH(request) {
       if (body.pricePerMinute !== undefined) updates.price_per_minute = body.pricePerMinute ? parseFloat(body.pricePerMinute) : null;
       if (body.pricePerDay !== undefined) updates.price_per_day = body.pricePerDay ? Math.round(parseFloat(body.pricePerDay)) : null;
       if (Array.isArray(body.allowedVehicleTypes)) updates.allowed_vehicle_types = body.allowedVehicleTypes;
+      if (Array.isArray(body.photos)) updates.photos = body.photos;
       if ('descripcion' in body) updates.descripcion = body.descripcion || null;
       if ('direccion'   in body) updates.direccion   = body.direccion   || null;
 

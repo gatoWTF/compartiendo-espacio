@@ -952,6 +952,14 @@ export default function DashboardPage() {
                     <div className="item-controls">
                       <div className="item-action-btns">
                         <button
+                          onClick={() => router.push(`/estacionamiento/${parking.id}`)}
+                          title="Ver perfil público y reseñas"
+                          aria-label="Ver perfil público y reseñas"
+                          className="ctrl-action-btn green"
+                        >
+                          <i className="fa-solid fa-up-right-from-square"></i>
+                        </button>
+                        <button
                           onClick={() => openEdit(parking)}
                           title="Editar"
                           aria-label="Editar estacionamiento"

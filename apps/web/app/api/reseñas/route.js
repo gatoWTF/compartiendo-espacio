@@ -14,20 +14,44 @@ export async function GET(request) {
     process.env.SUPABASE_SERVICE_ROLE_KEY,
   );
 
-  const { data, error } = await supabaseAdmin
+  // 1) Reseñas (reservas calificadas) del estacionamiento.
+  const { data: reviews, error } = await supabaseAdmin
     .from('reservas')
-    .select(`
-      calificacion,
-      comentario,
-      review_photo_url,
-      created_at,
-      perfiles:conductor_id ( nombre, apellido )
-    `)
+    .select('id, calificacion, comentario, review_photo_url, created_at, conductor_id')
     .eq('estacionamiento_id', estacionamiento_id)
     .not('calificacion', 'is', null)
     .order('created_at', { ascending: false })
-    .limit(20);
+    .limit(50);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ success: true, data: data || [] });
+
+  // 2) Perfiles de los autores (no hay FK declarada, así que consultamos aparte).
+  const ids = [...new Set((reviews || []).map(r => r.conductor_id).filter(Boolean))];
+  let perfiles = {};
+  if (ids.length) {
+    const { data: pf } = await supabaseAdmin
+      .from('perfiles')
+      .select('id, nombre, apellido, avatar_url')
+      .in('id', ids);
+    perfiles = Object.fromEntries((pf || []).map(p => [p.id, p]));
+  }
+
+  const data = (reviews || []).map(r => ({
+    id: r.id,
+    calificacion: r.calificacion,
+    comentario: r.comentario,
+    review_photo_url: r.review_photo_url,
+    created_at: r.created_at,
+    perfil: perfiles[r.conductor_id] || null,
+  }));
+
+  // Resumen: promedio y distribución de estrellas.
+  const total = data.length;
+  const promedio = total ? data.reduce((a, r) => a + r.calificacion, 0) / total : 0;
+  const distribucion = [1, 2, 3, 4, 5].reduce((acc, n) => {
+    acc[n] = data.filter(r => r.calificacion === n).length;
+    return acc;
+  }, {});
+
+  return NextResponse.json({ success: true, data, resumen: { total, promedio, distribucion } });
 }

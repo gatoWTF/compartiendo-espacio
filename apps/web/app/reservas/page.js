@@ -110,11 +110,11 @@ export default function ReservasPage() {
     }
   };
 
-  const handleSubmitReview = async ({ reservaId, stars, comentario }) => {
+  const handleSubmitReview = async ({ reservaId, stars, comentario, photoUrl }) => {
     const res = await fetch('/api/reservas/manage', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-      body: JSON.stringify({ action: 'calificar', reserva_id: reservaId, calificacion: stars, comentario }),
+      body: JSON.stringify({ action: 'calificar', reserva_id: reservaId, calificacion: stars, comentario, ...(photoUrl ? { review_photo_url: photoUrl } : {}) }),
     });
     const data = await res.json();
     if (!data.success) throw new Error(data.error || 'No se pudo enviar la calificación.');
