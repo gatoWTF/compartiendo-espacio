@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { api } from '../../src/lib/api';
 import { supabase } from '@parkings/supabase-db';
+import ConductorDashboard from '../../src/components/ConductorDashboard';
 
 const MiniMapComponent = dynamic(() => import('../../src/components/MiniMap'), {
   ssr: false,
@@ -391,6 +392,11 @@ export default function DashboardPage() {
       <h3 style={{ color: '#94a3b8' }}>Cargando...</h3>
     </div>
   );
+
+  // Los conductores ven un panel propio con reservas, vehículos, favoritos y gastos.
+  if (session?.user?.rol !== 'arrendador') {
+    return <ConductorDashboard user={session.user} />;
+  }
 
   return (
     <section className="dashboard-container">

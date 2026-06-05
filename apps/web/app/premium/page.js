@@ -9,41 +9,124 @@ import { PLANES, precioCiclo, mesesToPayback, NIVELES_CONDUCTOR, BADGES, FAQ, CO
 const fmt = (n) => n === 0 ? 'Gratis' : `$${n.toLocaleString('es-CL')}`;
 
 // ── Calculadora de ahorro para conductores ─────────────────────────────────
+const PRECIO_PRO = 2990;
+
 function Calculadora() {
   const [gasto, setGasto] = useState(30000);
   const ahorro = Math.round(gasto * (COMISION_PLATAFORMA / 100));
-  const conviene = ahorro >= 2990;
+  const conviene = ahorro >= PRECIO_PRO;
+  const neto = ahorro - PRECIO_PRO;
+  const ahorroAnual = neto > 0 ? neto * 12 : 0;
+  // % del slider para pintar la barra de progreso
+  const pct = Math.round(((gasto - 5000) / (150000 - 5000)) * 100);
+  const umbral = Math.ceil(PRECIO_PRO / (COMISION_PLATAFORMA / 100) / 1000) * 1000;
 
   return (
-    <div className="calc-wrap">
-      <h3><i className="fa-solid fa-calculator"></i> ¿Te conviene el plan Pro?</h3>
-      <p className="calc-sub">Mueve el slider según cuánto gastas en estacionamientos al mes:</p>
-      <div className="calc-slider-row">
-        <span>$5.000</span>
-        <input type="range" min={5000} max={150000} step={5000} value={gasto} onChange={e => setGasto(+e.target.value)} />
-        <span>$150.000</span>
+    <section className="calc2">
+      <div className="calc2-head">
+        <span className="section-badge"><i className="fa-solid fa-calculator"></i> Calculadora de ahorro</span>
+        <h2>¿Te conviene el plan Pro?</h2>
+        <p>Ajusta cuánto gastas al mes en estacionamientos y descubre tu ahorro real.</p>
       </div>
-      <p className="calc-gasto">Gasto mensual estimado: <strong>{fmt(gasto)}</strong></p>
-      <div className={`calc-result ${conviene ? 'yes' : 'no'}`}>
-        <div className="calc-numbers">
-          <div>
-            <span className="calc-label">Tarifa de servicio que pagarías (free)</span>
-            <span className="calc-val">{fmt(ahorro)}/mes</span>
+
+      <div className="calc2-card">
+        {/* Slider */}
+        <div className="calc2-slider-block">
+          <div className="calc2-gasto-display">
+            <span>Gasto mensual</span>
+            <strong>{fmt(gasto)}</strong>
           </div>
-          <div className="calc-vs"><i className="fa-solid fa-arrow-right"></i></div>
-          <div>
-            <span className="calc-label">Costo plan Conductor Pro</span>
-            <span className="calc-val">$2.990/mes</span>
+          <input
+            className="calc2-range"
+            type="range" min={5000} max={150000} step={5000}
+            value={gasto} onChange={e => setGasto(+e.target.value)}
+            style={{ '--pct': `${pct}%` }}
+          />
+          <div className="calc2-range-labels"><span>$5.000</span><span>$150.000</span></div>
+        </div>
+
+        {/* Comparación visual */}
+        <div className="calc2-compare">
+          <div className="calc2-col free">
+            <span className="calc2-col-tag">Plan Gratis</span>
+            <span className="calc2-col-num">{fmt(ahorro)}</span>
+            <span className="calc2-col-desc">en tarifas de servicio / mes</span>
+          </div>
+          <div className="calc2-arrow"><i className="fa-solid fa-arrow-right-arrow-left"></i></div>
+          <div className="calc2-col pro">
+            <span className="calc2-col-tag"><i className="fa-solid fa-crown"></i> Plan Pro</span>
+            <span className="calc2-col-num">{fmt(PRECIO_PRO)}</span>
+            <span className="calc2-col-desc">tarifa fija / mes · sin comisiones</span>
           </div>
         </div>
-        <div className="calc-verdict">
-          {conviene
-            ? <><i className="fa-solid fa-circle-check"></i> ¡Te conviene! Ahorras <strong>{fmt(ahorro - 2990)}/mes</strong> con Pro</>
-            : <><i className="fa-solid fa-circle-info"></i> Con ese uso, el plan Gratis es suficiente — Pro conviene desde ~$37.500/mes</>
-          }
+
+        {/* Veredicto */}
+        <div className={`calc2-verdict ${conviene ? 'yes' : 'no'}`}>
+          {conviene ? (
+            <>
+              <div className="calc2-verdict-ic"><i className="fa-solid fa-circle-check"></i></div>
+              <div>
+                <strong>¡Te conviene Pro!</strong>
+                <p>Ahorras <b>{fmt(neto)}/mes</b> · hasta <b>{fmt(ahorroAnual)}</b> al año.</p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="calc2-verdict-ic"><i className="fa-solid fa-circle-info"></i></div>
+              <div>
+                <strong>El plan Gratis te basta por ahora</strong>
+                <p>Pro empieza a convenir desde <b>~{fmt(umbral)}/mes</b> de gasto.</p>
+              </div>
+            </>
+          )}
         </div>
       </div>
-    </div>
+
+      <style jsx>{`
+        .calc2 { margin: 0 0 50px; }
+        .calc2-head { text-align: center; margin-bottom: 24px; }
+        .calc2-head .section-badge { display: inline-flex; align-items: center; gap: 8px; background: rgba(59,130,246,0.12); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3); padding: 5px 14px; border-radius: 99px; font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+        .calc2-head h2 { font-size: 1.9rem; font-weight: 900; color: white; margin: 0 0 8px; letter-spacing: -0.5px; }
+        .calc2-head p { color: #94a3b8; font-size: 0.92rem; max-width: 480px; margin: 0 auto; }
+
+        .calc2-card { background: linear-gradient(160deg, rgba(20,30,50,0.85), rgba(10,18,35,0.9)); border: 1px solid rgba(255,255,255,0.09); border-radius: 24px; padding: 28px; max-width: 640px; margin: 0 auto; }
+
+        .calc2-slider-block { margin-bottom: 26px; }
+        .calc2-gasto-display { display: flex; flex-direction: column; align-items: center; margin-bottom: 16px; }
+        .calc2-gasto-display span { font-size: 0.76rem; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+        .calc2-gasto-display strong { font-size: 2.4rem; font-weight: 900; color: white; line-height: 1.1; }
+        .calc2-range { width: 100%; -webkit-appearance: none; appearance: none; height: 8px; border-radius: 99px; background: linear-gradient(90deg, #3b82f6 var(--pct, 20%), rgba(255,255,255,0.1) var(--pct, 20%)); outline: none; cursor: pointer; }
+        .calc2-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 24px; height: 24px; border-radius: 50%; background: white; border: 4px solid #3b82f6; cursor: pointer; box-shadow: 0 2px 10px rgba(59,130,246,0.5); }
+        .calc2-range::-moz-range-thumb { width: 24px; height: 24px; border-radius: 50%; background: white; border: 4px solid #3b82f6; cursor: pointer; }
+        .calc2-range-labels { display: flex; justify-content: space-between; margin-top: 8px; font-size: 0.72rem; color: #475569; font-weight: 600; }
+
+        .calc2-compare { display: grid; grid-template-columns: 1fr auto 1fr; gap: 14px; align-items: center; margin-bottom: 22px; }
+        .calc2-col { text-align: center; padding: 18px 14px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.08); }
+        .calc2-col.free { background: rgba(100,116,139,0.08); }
+        .calc2-col.pro { background: rgba(59,130,246,0.1); border-color: rgba(59,130,246,0.3); }
+        .calc2-col-tag { display: inline-flex; align-items: center; gap: 5px; font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; }
+        .calc2-col.pro .calc2-col-tag { color: #60a5fa; }
+        .calc2-col-num { display: block; font-size: 1.7rem; font-weight: 900; color: white; margin: 6px 0 4px; }
+        .calc2-col-desc { font-size: 0.72rem; color: #64748b; line-height: 1.4; }
+        .calc2-arrow { color: #475569; font-size: 1.1rem; }
+
+        .calc2-verdict { display: flex; align-items: center; gap: 14px; padding: 18px 20px; border-radius: 16px; }
+        .calc2-verdict.yes { background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3); }
+        .calc2-verdict.no { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.25); }
+        .calc2-verdict-ic { font-size: 1.8rem; flex-shrink: 0; }
+        .calc2-verdict.yes .calc2-verdict-ic { color: #34d399; }
+        .calc2-verdict.no .calc2-verdict-ic { color: #fbbf24; }
+        .calc2-verdict strong { display: block; color: white; font-size: 1rem; font-weight: 800; }
+        .calc2-verdict p { margin: 3px 0 0; color: #94a3b8; font-size: 0.85rem; }
+        .calc2-verdict b { color: #e2e8f0; }
+
+        @media (max-width: 560px) {
+          .calc2-compare { grid-template-columns: 1fr; }
+          .calc2-arrow { transform: rotate(90deg); }
+          .calc2-gasto-display strong { font-size: 2rem; }
+        }
+      `}</style>
+    </section>
   );
 }
 
@@ -334,7 +417,7 @@ export default function PremiumPage() {
         <i className="fa-solid fa-circle-info"></i> Demo académica · pago simulado. En producción se integra Webpay (Transbank).
       </p>
 
-      <style jsx>{`
+      <style jsx global>{`
         .premium-wrap { max-width: 1100px; margin: 0 auto; padding: 30px 20px 80px; color: #e2e8f0; }
 
         /* HERO */

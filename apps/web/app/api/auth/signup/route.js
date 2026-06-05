@@ -23,7 +23,7 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Demasiados intentos. Espera unos minutos.' }, { status: 429 });
     }
 
-    const { email, password, nombre, apellido, rol, telefono, tipo_vehiculo, empresa } = await request.json();
+    const { email, password, nombre, apellido, rol, telefono, tipo_vehiculo, patente, empresa } = await request.json();
 
     if (!email || !password || !nombre || !apellido || !rol) {
       return NextResponse.json({ error: 'Faltan campos requeridos.' }, { status: 400 });
@@ -65,6 +65,20 @@ export async function POST(request) {
 
     const { error: profileError } = await admin.from('perfiles').upsert(profilePayload, { onConflict: 'id' });
     if (profileError) console.error('[signup] Profile error:', profileError.message);
+
+    // Si el conductor registró una patente, creamos su primer vehículo.
+    if (rol === 'cliente' && patente && String(patente).trim()) {
+      const TIPO_LABEL = { auto: 'Automóvil', moto: 'Motocicleta', bicicleta: 'Bicicleta', scooter: 'Scooter' };
+      const { error: vehError } = await admin.from('vehiculos').insert({
+        user_id: userData.user.id,
+        patente: String(patente).trim().toUpperCase(),
+        marca: TIPO_LABEL[tipo_vehiculo] || 'Vehículo',
+        modelo: '',
+        color: '',
+        es_principal: true,
+      });
+      if (vehError) console.error('[signup] Vehiculo error:', vehError.message);
+    }
 
     const { createClient } = await import('@supabase/supabase-js');
     const anonClient = createClient(

@@ -3,10 +3,11 @@ import { useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { supabase } from '@parkings/supabase-db';
 
-export default function ReviewModal({ reservaId, onClose, onSubmit }) {
-  const [stars, setStars] = useState(0);
+export default function ReviewModal({ reservaId, onClose, onSubmit, initialStars = 0, initialComentario = '' }) {
+  const esEdicion = initialStars > 0;
+  const [stars, setStars] = useState(initialStars);
   const [hovered, setHovered] = useState(0);
-  const [comentario, setComentario] = useState('');
+  const [comentario, setComentario] = useState(initialComentario);
   const [loading, setLoading] = useState(false);
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
@@ -59,7 +60,7 @@ export default function ReviewModal({ reservaId, onClose, onSubmit }) {
           <div>
             <h3 id="review-modal-title" style={{ color: '#f8fafc', fontWeight: 800, fontSize: '1.15rem', margin: 0 }}>
               <i className="fa-solid fa-star" style={{ color: '#f59e0b', marginRight: '8px' }}></i>
-              Califica tu experiencia
+              {esEdicion ? 'Edita tu reseña' : 'Califica tu experiencia'}
             </h3>
             <p style={{ color: '#64748b', fontSize: '0.82rem', marginTop: '4px' }}>Tu opinión ayuda a mejorar la comunidad</p>
           </div>

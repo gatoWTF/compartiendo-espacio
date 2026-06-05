@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useMapRadar } from '../../src/hooks/useMapRadar';
 import { api } from '../../src/lib/api';
 import { supabase } from '@parkings/supabase-db';
@@ -13,26 +13,32 @@ const ParkingSelector = dynamic(() => import('../../src/components/ParkingSelect
 function MapaPageInner() {
   const { state, actions } = useMapRadar();
   const searchParams = useSearchParams();
+  const pendingSelectRef = useRef(null);
 
-  // Si venimos del ranking con ?id=&lat=&lng= seleccionamos ese estacionamiento
+  // Si venimos del ranking con ?id=&lat=&lng=, recentramos el radar en esas
+  // coordenadas para que el backend cargue ese estacionamiento, y lo marcamos
+  // como "pendiente de seleccionar".
   useEffect(() => {
     const id = searchParams.get('id');
     const lat = parseFloat(searchParams.get('lat'));
     const lng = parseFloat(searchParams.get('lng'));
     if (!id) return;
-    // Esperar a que los parkings estén cargados y luego seleccionar el correcto
-    const trySelect = (retries = 0) => {
-      const found = state.parkings?.find(p => String(p.id) === String(id));
-      if (found) {
-        actions.setSelectedSpot(found);
-        if (!isNaN(lat) && !isNaN(lng)) actions.setLocationOverride({ lat, lng });
-      } else if (retries < 10) {
-        setTimeout(() => trySelect(retries + 1), 300);
-      }
-    };
-    trySelect();
+    pendingSelectRef.current = id;
+    if (!isNaN(lat) && !isNaN(lng)) actions.setLocationOverride({ lat, lng });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
+
+  // Cuando los estacionamientos se recargan alrededor de esa ubicación,
+  // seleccionamos el pendiente en cuanto aparece.
+  useEffect(() => {
+    if (!pendingSelectRef.current) return;
+    const found = state.parkings?.find(p => String(p.id) === String(pendingSelectRef.current));
+    if (found) {
+      actions.setSelectedSpot(found);
+      pendingSelectRef.current = null;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.parkings]);
   const [filters, setFilters] = useState({ p2p: false, pmr: false, vehicle: null });
   const [localRadius, setLocalRadius] = useState(state.radius);
   const [panelCollapsed, setPanelCollapsed] = useState(false);
@@ -532,7 +538,10 @@ function MapaPageInner() {
                     ) : reviews.length === 0 ? (
                       <div className="reviews-empty">
                         <i className="fa-regular fa-comment-dots"></i>
-                        <p>Aún no hay reseñas. ¡Sé el primero!</p>
+                        <p>Aún no hay reseñas.</p>
+                        <p style={{ fontSize: '0.72rem', color: '#475569', marginTop: 6 }}>
+                          Reserva y completa tu visita para poder dejar la primera reseña.
+                        </p>
                       </div>
                     ) : (
                       <div className="reviews-list">
