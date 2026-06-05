@@ -243,6 +243,8 @@ export default function DashboardPage() {
         setAllowedVehicleTypes(['car']);
         setPhotos([]);
         showToast('¡Estacionamiento publicado con éxito!', 'success');
+      } else if (!result.success) {
+        showToast(result.error || 'No se pudo publicar el estacionamiento.', 'error');
       }
     } catch (err) {
       showToast(err.message || 'Error al guardar en Supabase.', 'error');

@@ -131,6 +131,15 @@ export default function ParkingSelector({ parking, onClose, onReserve, isReservi
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Close on Escape key
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') handleClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  // handleClose is stable (no deps change); using ref avoids stale closure issues
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const spots = useMemo(
     () => generateSpots(parking, tempLocks || new Set()),
     [parking, tempLocks]
