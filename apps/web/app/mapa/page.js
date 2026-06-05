@@ -546,7 +546,7 @@ function MapaPageInner() {
                     ) : (
                       <div className="reviews-list">
                         {reviews.map((r, i) => {
-                          const nombre = r.perfiles?.nombre ? `${r.perfiles.nombre}${r.perfiles.apellido ? ' ' + r.perfiles.apellido[0] + '.' : ''}` : 'Usuario';
+                          const nombre = r.perfil?.nombre ? `${r.perfil.nombre.split(' ')[0]}${r.perfil.apellido ? ' ' + r.perfil.apellido[0] + '.' : ''}` : 'Usuario';
                           const fecha = new Date(r.created_at).toLocaleDateString('es-CL', { month: 'short', year: 'numeric' });
                           return (
                             <div key={i} className="review-card">
@@ -581,6 +581,12 @@ function MapaPageInner() {
               </div>
 
               <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                <a
+                  href={`/estacionamiento/${state.selectedSpot.id}`}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '9px', borderRadius: '10px', border: '1px solid rgba(168,85,247,0.3)', background: 'rgba(168,85,247,0.08)', color: '#c084fc', fontSize: '0.85rem', fontWeight: 700, textDecoration: 'none', marginBottom: '8px', boxSizing: 'border-box' }}
+                >
+                  <i className="fa-solid fa-id-card"></i> Ver perfil completo y reseñas
+                </a>
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
                   <a
                     href={`https://www.google.com/maps/dir/?api=1&destination=${state.selectedSpot.lat},${state.selectedSpot.lng}`}
