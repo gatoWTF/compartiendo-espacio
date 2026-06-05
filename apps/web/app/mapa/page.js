@@ -69,7 +69,8 @@ function MapaPageInner() {
     if (!lat || !lng) return;
     const region = detectarRegion(lat, lng);
     if (region) setSearchRegion(region.id);
-  }, [searchOpen]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchOpen, state.userLoc?.lat, state.userLoc?.lng]);
 
   // ── Selector de plaza ──
   const [selectorOpen, setSelectorOpen] = useState(false);
@@ -426,7 +427,7 @@ function MapaPageInner() {
       )}
 
       {/* ── ÁREA DEL MAPA ── */}
-      <div className="map-area" style={{ position: 'relative' }}>
+      <div className="map-area">
         <Map
           location={state.userLoc}
           isLoading={state.loading}

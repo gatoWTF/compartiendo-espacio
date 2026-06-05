@@ -32,13 +32,18 @@ export default function EstacionamientoDetalle() {
   const esOwner = parking && userId && parking.user_id === userId;
 
   const cargar = async () => {
-    const [pRes, rRes] = await Promise.all([
-      fetch(`/api/mapas/search?id=${id}`).then(r => r.json()),
-      fetch(`/api/reseñas?estacionamiento_id=${id}`).then(r => r.json()),
-    ]);
-    if (pRes.success) setParking(pRes.data);
-    if (rRes.success) { setReviews(rRes.data || []); setResumen(rRes.resumen || { total: 0, promedio: 0, distribucion: {} }); }
-    setLoading(false);
+    try {
+      const [pRes, rRes] = await Promise.all([
+        fetch(`/api/mapas/search?id=${id}`).then(r => r.json()),
+        fetch(`/api/reseñas?estacionamiento_id=${id}`).then(r => r.json()),
+      ]);
+      if (pRes.success) setParking(pRes.data);
+      if (rRes.success) { setReviews(rRes.data || []); setResumen(rRes.resumen || { total: 0, promedio: 0, distribucion: {} }); }
+    } catch {
+      // Network error: parking stays null → shows "not found" state
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -74,6 +79,7 @@ export default function EstacionamientoDetalle() {
 
   const guardarFotos = async (photos) => {
     const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) { toast.error('Sesión expirada. Vuelve a iniciar sesión.'); return; }
     const res = await fetch('/api/mapas/search', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
