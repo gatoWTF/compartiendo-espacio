@@ -1,6 +1,6 @@
 'use client';
-import { useState, useEffect, use as usePromise } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '@parkings/supabase-db';
 import { toast } from 'react-hot-toast';
 
@@ -17,8 +17,8 @@ function Estrellas({ n, size = '0.9rem' }) {
   );
 }
 
-export default function EstacionamientoDetalle({ params }) {
-  const { id } = usePromise(params);
+export default function EstacionamientoDetalle() {
+  const { id } = useParams();
   const router = useRouter();
   const [parking, setParking]   = useState(null);
   const [reviews, setReviews]   = useState([]);
@@ -137,7 +137,7 @@ export default function EstacionamientoDetalle({ params }) {
           <div className="det-gallery-grid">
             {fotos.map((url, i) => (
               <div key={i} className="det-photo" onClick={() => setLightbox(url)}>
-                <img src={url} alt={`Foto ${i + 1}`} onError={e => { e.target.closest('.det-photo').style.display = 'none'; }} />
+                <img src={url} alt={`Foto ${i + 1}`} loading={i < 3 ? 'eager' : 'lazy'} onError={e => { e.target.closest('.det-photo').style.display = 'none'; }} />
                 {esOwner && (
                   <button className="det-photo-del" onClick={e => { e.stopPropagation(); quitarFoto(url); }} aria-label="Quitar foto">
                     <i className="fa-solid fa-trash"></i>
@@ -224,7 +224,7 @@ export default function EstacionamientoDetalle({ params }) {
                       </div>
                       {r.comentario && <p className="det-rev-text">{r.comentario}</p>}
                       {r.review_photo_url && (
-                        <img src={r.review_photo_url} className="det-rev-photo" alt="Foto de reseña"
+                        <img src={r.review_photo_url} className="det-rev-photo" alt="Foto de reseña" loading="lazy"
                           onClick={() => setLightbox(r.review_photo_url)}
                           onError={e => { e.target.style.display = 'none'; }} />
                       )}
@@ -254,6 +254,23 @@ export default function EstacionamientoDetalle({ params }) {
           )}
         </aside>
       </div>
+
+      {/* MOBILE STICKY CTA */}
+      {!esOwner && (
+        <div className="det-sticky-cta">
+          <div className="det-sticky-price">
+            {parking.precio_hora === 0 ? 'Gratis' : <><strong>${Number(parking.precio_hora).toLocaleString('es-CL')}</strong>/hr</>}
+          </div>
+          <button
+            className="det-btn primary"
+            disabled={cupos <= 0}
+            onClick={() => router.push(`/mapa?id=${parking.id}&lat=${parking.lat}&lng=${parking.lng}`)}
+            style={{ flex: 1, maxWidth: 220 }}
+          >
+            <i className="fa-solid fa-border-all"></i> {cupos > 0 ? 'Reservar plaza' : 'Sin cupos'}
+          </button>
+        </div>
+      )}
 
       {/* LIGHTBOX */}
       {lightbox && (
@@ -347,9 +364,37 @@ export default function EstacionamientoDetalle({ params }) {
         .det-lb img { max-width: 92vw; max-height: 85vh; object-fit: contain; border-radius: 14px; }
         .det-lb-close { position: absolute; top: 24px; right: 28px; width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: white; font-size: 1.2rem; cursor: pointer; }
 
+        /* Mobile sticky reservation bar */
+        .det-sticky-cta {
+          display: none;
+          position: fixed;
+          bottom: 0;
+          left: 0; right: 0;
+          z-index: 2000;
+          background: rgba(15,23,42,0.95);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          border-top: 1px solid rgba(255,255,255,0.08);
+          padding: 12px 20px;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+        }
+        .det-sticky-price { color: #94a3b8; font-size: 0.85rem; }
+        .det-sticky-price strong { color: #fbbf24; font-size: 1.1rem; font-weight: 800; }
+
         @media (max-width: 820px) {
           .det-grid { grid-template-columns: 1fr; }
-          .det-facts { grid-template-columns: 1fr; }
+          .det-side { order: -1; } /* stats sidebar above on mobile */
+          .det-facts { grid-template-columns: 1fr 1fr; }
+          .det-hero { flex-direction: column; }
+          .det-hero > .det-btn { display: none; } /* hide hero CTA; sticky bar replaces it */
+          .det-sticky-cta { display: flex; }
+          .det-wrap { padding-bottom: 90px; } /* space for sticky bar */
+        }
+        @media (max-width: 500px) {
+          .det-gallery-grid { grid-template-columns: repeat(auto-fill, minmax(130px,1fr)); }
+          .det-hero h1 { font-size: 1.5rem; }
         }
       `}</style>
     </div>

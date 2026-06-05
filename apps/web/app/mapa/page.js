@@ -83,6 +83,35 @@ function MapaPageInner() {
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewsOpen, setReviewsOpen] = useState(false);
 
+  // ── Mobile bottom sheet drag ──
+  const sheetRef = useRef(null);
+  const dragStartY = useRef(null);
+  const dragStartH = useRef(null);
+  const [sheetHeight, setSheetHeight] = useState(null); // null = CSS default
+
+  const onSheetTouchStart = (e) => {
+    if (e.target.closest('.reviews-body') || e.target.closest('.spot-photos')) return;
+    dragStartY.current = e.touches[0].clientY;
+    dragStartH.current = sheetRef.current?.offsetHeight ?? 0;
+  };
+  const onSheetTouchMove = (e) => {
+    if (dragStartY.current === null) return;
+    const dy = dragStartY.current - e.touches[0].clientY;
+    const newH = Math.max(80, Math.min(window.innerHeight - 80, dragStartH.current + dy));
+    setSheetHeight(newH);
+  };
+  const onSheetTouchEnd = () => {
+    if (sheetRef.current) {
+      const h = sheetRef.current.offsetHeight;
+      const vh = window.innerHeight;
+      if (h < 140) { actions.setSelectedSpot(null); setSheetHeight(null); }
+      else if (h < vh * 0.45) setSheetHeight(Math.round(vh * 0.38));
+      else if (h > vh * 0.8)  setSheetHeight(Math.round(vh * 0.88));
+      else                    setSheetHeight(Math.round(vh * 0.55));
+    }
+    dragStartY.current = null;
+  };
+
   // Teclado para el lightbox: Esc cierra, flechas navegan
   useEffect(() => {
     if (!lightbox) return;
@@ -101,6 +130,7 @@ function MapaPageInner() {
 
   // Cargar reseñas cuando cambia el estacionamiento seleccionado
   useEffect(() => {
+    setSheetHeight(null); // reset drag height on new spot
     if (!state.selectedSpot) { setReviews([]); setReviewsOpen(false); return; }
     setReviewsLoading(true);
     fetch(`/api/reseñas?estacionamiento_id=${state.selectedSpot.id}`)
@@ -387,6 +417,14 @@ function MapaPageInner() {
         </div>
       </div>
 
+      {/* ── Pill flotante: estacionamientos encontrados ── */}
+      {!state.loading && state.parkings.length > 0 && (
+        <div style={{ position: 'absolute', top: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 999, background: 'rgba(15,23,42,0.88)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '99px', padding: '7px 18px', color: '#e2e8f0', fontSize: '0.8rem', fontWeight: 700, pointerEvents: 'none', whiteSpace: 'nowrap', boxShadow: '0 4px 20px rgba(0,0,0,0.4)' }}>
+          <i className="fa-solid fa-square-parking" style={{ color: '#3b82f6', marginRight: 8 }}></i>
+          {state.parkings.length} estacionamiento{state.parkings.length !== 1 ? 's' : ''} en el área
+        </div>
+      )}
+
       {/* ── ÁREA DEL MAPA ── */}
       <div className="map-area" style={{ position: 'relative' }}>
         <Map
@@ -420,7 +458,16 @@ function MapaPageInner() {
         const isFull = availableSpots === 0;
 
         return (
-          <div className={`glass-panel-strict reservation-panel ${state.selectedSpot ? 'slide-in' : ''}`}>
+          <div
+            ref={sheetRef}
+            className={`glass-panel-strict reservation-panel ${state.selectedSpot ? 'slide-in' : ''}`}
+            style={sheetHeight ? { height: sheetHeight, maxHeight: 'none' } : {}}
+            onTouchStart={onSheetTouchStart}
+            onTouchMove={onSheetTouchMove}
+            onTouchEnd={onSheetTouchEnd}
+          >
+            {/* Drag handle — visible on mobile only */}
+            <div className="sheet-drag-handle" aria-hidden="true"><span></span></div>
             <div className="res-header">
               <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <i className="fa-solid fa-square-parking" style={{ color: '#3b82f6' }}></i>
@@ -712,11 +759,12 @@ function MapaPageInner() {
         .map-page-wrapper {
           position: relative;
           width: 100%;
-          height: calc(100vh - 80px);
+          height: calc(100dvh - 96px);
           overflow: hidden;
-          background: #020617; /* Slate 950 */
+          background: #020617;
+          overscroll-behavior: none;
         }
-        .map-area { width: 100%; height: 100%; }
+        .map-area { position: absolute; inset: 0; overscroll-behavior: none; }
 
         /* === TRUE GLASSMORPHISM === */
         .glass-panel-strict {
@@ -1054,18 +1102,37 @@ function MapaPageInner() {
         .search-input::placeholder { color: #64748b; }
         .search-input option { background: #1e293b; color: white; }
 
+        /* === DRAG HANDLE (mobile only) === */
+        .sheet-drag-handle {
+          display: none;
+          justify-content: center;
+          padding: 10px 0 4px;
+          cursor: grab;
+          touch-action: none;
+        }
+        .sheet-drag-handle span {
+          width: 36px; height: 4px;
+          border-radius: 2px;
+          background: rgba(255,255,255,0.2);
+          display: block;
+        }
+
         @media (max-width: 600px) {
+          .sheet-drag-handle { display: flex; }
           .radar-overlay { top: 16px; left: 16px; width: calc(100% - 32px); gap: 10px; }
-          .control-panel { max-height: 62vh; }
+          .control-panel { max-height: 55vh; }
           .reservation-panel {
             bottom: 0;
             right: 0;
             left: 0;
             width: 100%;
             max-width: 100%;
-            max-height: 70vh;
+            height: 55vh;
+            max-height: 92vh;
             border-radius: 20px 20px 0 0;
+            border-bottom: none;
             animation: panelSlideUp 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+            transition: height 0.12s ease;
           }
           @keyframes panelSlideUp {
             from { opacity: 0; transform: translateY(100%); }
