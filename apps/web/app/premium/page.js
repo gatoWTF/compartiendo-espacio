@@ -89,31 +89,79 @@ function GamificacionSection() {
 
 // ── Comparativa mercado (insight de investigación) ─────────────────────────
 function ComparativaSection() {
-  const rows = [
-    { app: 'SpotHero',     conductor: 'Gratis siempre', comision: '~12–15%',  premium: '—' },
-    { app: 'JustPark',     conductor: 'Gratis siempre', comision: '3–20%',    premium: '—' },
-    { app: 'EasyPark',     conductor: 'Gratis / €2.99', comision: 'Variable', premium: '€2.99/mes' },
-    { app: 'Parkings Together', conductor: 'Gratis siempre', comision: '5–15%', premium: '$2.990/mes', highlight: true },
+  const features = [
+    { label: 'Uso gratuito conductor',     pt: true,  sh: true,  jp: true,  ep: false },
+    { label: 'Sin comisión para arrendador', pt: false, sh: false, jp: false, ep: false },
+    { label: 'Comisión baja (≤8%)',        pt: true,  sh: false, jp: false, ep: false },
+    { label: 'App en español (Chile)',      pt: true,  sh: false, jp: false, ep: true  },
+    { label: 'Reserva por hora',            pt: true,  sh: true,  jp: true,  ep: true  },
+    { label: 'P2P entre particulares',      pt: true,  sh: false, jp: true,  ep: false },
+    { label: 'Ranking por calidad',         pt: true,  sh: false, jp: false, ep: false },
+    { label: 'Plan Premium accesible',      pt: true,  sh: false, jp: false, ep: true  },
+    { label: 'Soporte en Chile',            pt: true,  sh: false, jp: false, ep: false },
   ];
+
+  const COLS = [
+    { key: 'pt', label: 'Parkings Together', icon: 'fa-location-pin', color: '#3b82f6', highlight: true },
+    { key: 'sh', label: 'SpotHero',          icon: 'fa-circle',       color: '#64748b', highlight: false },
+    { key: 'jp', label: 'JustPark',          icon: 'fa-circle',       color: '#64748b', highlight: false },
+    { key: 'ep', label: 'EasyPark',          icon: 'fa-circle',       color: '#64748b', highlight: false },
+  ];
+
+  const ptScore = features.filter(f => f.pt).length;
+
   return (
     <section className="comp-section">
       <span className="section-badge"><i className="fa-solid fa-scale-balanced"></i> Vs. la competencia</span>
       <h2>¿Por qué Parkings Together?</h2>
-      <div className="comp-table-wrap">
-        <table className="comp-table">
-          <thead><tr><th>Plataforma</th><th>Conductor</th><th>Comisión plataforma</th><th>Premium</th></tr></thead>
-          <tbody>
-            {rows.map(r => (
-              <tr key={r.app} className={r.highlight ? 'hl-row' : ''}>
-                <td>{r.highlight ? <><i className="fa-solid fa-location-pin" style={{ color: '#3b82f6', marginRight: 6 }}></i><strong>{r.app}</strong></> : r.app}</td>
-                <td>{r.conductor}</td>
-                <td>{r.comision}</td>
-                <td>{r.premium}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <p className="comp-subtitle">La única plataforma de estacionamientos diseñada para Chile, con las mejores condiciones del mercado.</p>
+
+      {/* Score cards */}
+      <div className="comp-scores">
+        {COLS.map(c => {
+          const score = features.filter(f => f[c.key]).length;
+          return (
+            <div key={c.key} className={`comp-score-card ${c.highlight ? 'comp-score-hl' : ''}`}>
+              <i className={`fa-solid ${c.icon}`} style={{ color: c.highlight ? '#3b82f6' : '#475569', fontSize: c.highlight ? '1rem' : '0.7rem', marginBottom: 8, display: 'block' }}></i>
+              <strong className="comp-score-name">{c.label}</strong>
+              <div className="comp-score-num">
+                <span style={{ color: c.highlight ? '#3b82f6' : '#64748b', fontWeight: 900 }}>{score}</span>
+                <span style={{ color: '#334155', fontSize: '0.75rem' }}>/{features.length}</span>
+              </div>
+              <div className="comp-score-bar-wrap">
+                <div className="comp-score-bar" style={{ width: `${(score/features.length)*100}%`, background: c.highlight ? 'linear-gradient(90deg,#3b82f6,#10b981)' : '#1e293b' }}></div>
+              </div>
+              {c.highlight && <span className="comp-winner-badge"><i className="fa-solid fa-trophy"></i> Mejor opción</span>}
+            </div>
+          );
+        })}
       </div>
+
+      {/* Feature grid */}
+      <div className="comp-grid-wrap">
+        <div className="comp-grid-head">
+          <div className="comp-feat-col">Característica</div>
+          {COLS.map(c => (
+            <div key={c.key} className={`comp-app-col ${c.highlight ? 'hl' : ''}`}>
+              <i className={`fa-solid ${c.icon}`} style={{ color: c.highlight ? '#3b82f6' : '#475569', fontSize: c.highlight ? '0.9rem' : '0.6rem', marginRight: 5 }}></i>
+              {c.label.split(' ')[0]}
+            </div>
+          ))}
+        </div>
+        {features.map((f, i) => (
+          <div key={i} className={`comp-grid-row ${i % 2 === 0 ? 'even' : ''}`}>
+            <div className="comp-feat-col">{f.label}</div>
+            {COLS.map(c => (
+              <div key={c.key} className={`comp-app-col ${c.highlight ? 'hl' : ''}`}>
+                {f[c.key]
+                  ? <span className="comp-check"><i className="fa-solid fa-circle-check"></i></span>
+                  : <span className="comp-cross"><i className="fa-solid fa-circle-xmark"></i></span>}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+
       <p className="comp-note"><i className="fa-solid fa-circle-info"></i> Datos basados en análisis público de tarifas de SpotHero, JustPark y EasyPark (junio 2026).</p>
     </section>
   );
@@ -378,12 +426,41 @@ export default function PremiumPage() {
         /* COMPARATIVA */
         .comp-section { margin: 0 0 50px; }
         .comp-section .section-badge { display: block; text-align: center; margin: 0 auto 14px; width: fit-content; }
-        .comp-table-wrap { overflow-x: auto; margin-top: 20px; }
-        .comp-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
-        .comp-table th { text-align: left; padding: 10px 16px; color: #64748b; font-weight: 700; border-bottom: 1px solid rgba(255,255,255,0.07); font-size: 0.78rem; letter-spacing: 0.5px; }
-        .comp-table td { padding: 12px 16px; color: #cbd5e1; border-bottom: 1px solid rgba(255,255,255,0.04); }
-        .comp-table tr.hl-row td { background: rgba(59,130,246,0.07); color: white; }
-        .comp-note { color: #475569; font-size: 0.78rem; margin-top: 12px; display: flex; align-items: center; gap: 6px; }
+        .comp-section h2 { text-align: center; font-size: 1.9rem; font-weight: 900; margin: 0 0 10px; color: white; letter-spacing: -0.5px; }
+        .comp-subtitle { text-align: center; color: #64748b; font-size: 0.9rem; margin: 0 auto 30px; max-width: 500px; line-height: 1.6; }
+
+        /* Score cards */
+        .comp-scores { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 24px; }
+        .comp-score-card { background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; padding: 18px 14px; text-align: center; position: relative; }
+        .comp-score-hl { background: rgba(37,99,235,0.1); border-color: rgba(59,130,246,0.35); box-shadow: 0 0 24px rgba(59,130,246,0.1); }
+        .comp-score-name { display: block; font-size: 0.78rem; color: #94a3b8; font-weight: 700; margin-bottom: 10px; line-height: 1.3; }
+        .comp-score-hl .comp-score-name { color: #93c5fd; }
+        .comp-score-num { font-size: 1.6rem; font-weight: 900; margin-bottom: 8px; }
+        .comp-score-bar-wrap { height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden; }
+        .comp-score-bar { height: 100%; border-radius: 2px; transition: width 0.6s ease; }
+        .comp-winner-badge { display: inline-flex; align-items: center; gap: 4px; background: rgba(251,191,36,0.12); color: #fbbf24; border: 1px solid rgba(251,191,36,0.25); border-radius: 99px; font-size: 0.65rem; font-weight: 800; padding: 3px 8px; margin-top: 10px; }
+
+        /* Feature grid */
+        .comp-grid-wrap { border: 1px solid rgba(255,255,255,0.08); border-radius: 18px; overflow: hidden; }
+        .comp-grid-head { display: grid; grid-template-columns: 1fr repeat(4,80px); background: rgba(15,23,42,0.8); padding: 12px 16px; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+        .comp-grid-row { display: grid; grid-template-columns: 1fr repeat(4,80px); padding: 11px 16px; gap: 8px; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.04); transition: background 0.15s; }
+        .comp-grid-row.even { background: rgba(255,255,255,0.02); }
+        .comp-grid-row:last-child { border-bottom: none; }
+        .comp-grid-row:hover { background: rgba(59,130,246,0.04); }
+        .comp-feat-col { font-size: 0.82rem; color: #94a3b8; }
+        .comp-grid-head .comp-feat-col { color: #475569; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+        .comp-app-col { text-align: center; font-size: 0.72rem; color: #475569; font-weight: 700; }
+        .comp-app-col.hl { color: #93c5fd; }
+        .comp-check { color: #10b981; font-size: 1rem; }
+        .comp-cross { color: #1e293b; font-size: 0.85rem; }
+        .comp-note { color: #475569; font-size: 0.78rem; margin-top: 14px; display: flex; align-items: center; gap: 6px; }
+
+        @media (max-width: 680px) {
+          .comp-scores { grid-template-columns: repeat(2,1fr); }
+          .comp-grid-head { grid-template-columns: 1fr repeat(4,54px); padding: 10px 12px; }
+          .comp-grid-row { grid-template-columns: 1fr repeat(4,54px); padding: 10px 12px; }
+          .comp-feat-col { font-size: 0.75rem; }
+        }
 
         /* RANKING PROMO */
         .ranking-promo { display: flex; align-items: center; gap: 30px; background: linear-gradient(135deg, rgba(59,130,246,0.1), rgba(139,92,246,0.08)); border: 1px solid rgba(139,92,246,0.2); border-radius: 24px; padding: 36px; margin: 20px 0 50px; }
