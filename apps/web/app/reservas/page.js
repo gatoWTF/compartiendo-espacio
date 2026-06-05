@@ -25,6 +25,7 @@ function fmtFecha(iso) {
 export default function ReservasPage() {
   const router = useRouter();
   const [session, setSession] = useState(null);
+  const [rol, setRol] = useState(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('conductor');
   const [reservas, setReservas] = useState([]);
@@ -37,6 +38,8 @@ export default function ReservasPage() {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       if (!s) { router.push('/auth?redirectTo=/reservas'); return; }
       setSession(s);
+      supabase.from('perfiles').select('rol').eq('id', s.user.id).single()
+        .then(({ data }) => setRol(data?.rol || s.user.user_metadata?.rol || 'cliente'));
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => {
       if (!s) router.push('/auth?redirectTo=/reservas');
@@ -45,38 +48,44 @@ export default function ReservasPage() {
     return () => subscription.unsubscribe();
   }, [router]);
 
-  const fetchReservas = useCallback(async (token) => {
+  const fetchReservas = useCallback(async (token, esArrendador) => {
     setLoading(true);
     try {
-      const [resCond, resArr] = await Promise.all([
+      const peticiones = [
         fetch('/api/reservas/manage?scope=conductor', {
           headers: { Authorization: `Bearer ${token}` },
         }).then(r => r.json()),
-        fetch('/api/reservas/manage?scope=arrendador', {
-          headers: { Authorization: `Bearer ${token}` },
-        }).then(r => r.json()),
-      ]);
+      ];
+      if (esArrendador) {
+        peticiones.push(
+          fetch('/api/reservas/manage?scope=arrendador', {
+            headers: { Authorization: `Bearer ${token}` },
+          }).then(r => r.json())
+        );
+      }
+      const [resCond, resArr] = await Promise.all(peticiones);
       setReservas(resCond.success ? (resCond.data || []) : []);
-      setReservasArr(resArr.success ? (resArr.data || []) : []);
+      setReservasArr(resArr?.success ? (resArr.data || []) : []);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    if (!session) return;
-    fetchReservas(session.access_token);
+    if (!session || rol === null) return;
+    const esArrendador = rol === 'arrendador';
+    fetchReservas(session.access_token, esArrendador);
 
     // Realtime updates for reservas
     const channel = supabase
       .channel('reservas-page')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'reservas' }, () => {
-        fetchReservas(session.access_token);
+        fetchReservas(session.access_token, esArrendador);
       })
       .subscribe();
 
     return () => supabase.removeChannel(channel);
-  }, [session, fetchReservas]);
+  }, [session, rol, fetchReservas]);
 
   const doAction = async (action, reservaId, extra = {}) => {
     setActionLoading(reservaId + action);
@@ -126,11 +135,13 @@ export default function ReservasPage() {
         </p>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs — la pestaña de arrendador solo se muestra si el rol lo es */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
         {[
           { key: 'conductor', label: 'Como Conductor', icon: 'fa-steering-wheel', count: reservas.filter(r => r.estado === 'pendiente' || r.estado === 'confirmada').length },
-          { key: 'arrendador', label: 'Como Arrendador', icon: 'fa-warehouse', count: reservasArr.filter(r => r.estado === 'pendiente').length },
+          ...(rol === 'arrendador'
+            ? [{ key: 'arrendador', label: 'Como Arrendador', icon: 'fa-warehouse', count: reservasArr.filter(r => r.estado === 'pendiente').length }]
+            : []),
         ].map(t => (
           <button
             key={t.key}
@@ -246,6 +257,15 @@ export default function ReservasPage() {
                       <i className="fa-solid fa-star"></i> Calificar
                     </button>
                   )}
+                  {tab === 'conductor' && r.estado === 'completada' && r.calificacion && (
+                    <button
+                      onClick={() => setRatingModal({ reservaId: r.id, stars: r.calificacion, comentario: r.comentario || '' })}
+                      style={actionBtn('rgba(148,163,184,0.1)', 'rgba(148,163,184,0.3)', '#cbd5e1')}
+                      aria-label="Editar reseña"
+                    >
+                      <i className="fa-solid fa-pen"></i> Editar reseña
+                    </button>
+                  )}
                 </div>
               </div>
             );
@@ -256,6 +276,8 @@ export default function ReservasPage() {
       {ratingModal && (
         <ReviewModal
           reservaId={ratingModal.reservaId}
+          initialStars={ratingModal.stars || 0}
+          initialComentario={ratingModal.comentario || ''}
           onClose={() => setRatingModal(null)}
           onSubmit={handleSubmitReview}
         />
