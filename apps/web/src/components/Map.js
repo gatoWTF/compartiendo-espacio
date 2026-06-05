@@ -215,7 +215,7 @@ export default function Map({
         @keyframes pin-pulse { 0% { transform:scale(1); box-shadow:0 0 0 0 rgba(34,197,94,0.7); } 70% { transform:scale(1.1); box-shadow:0 0 0 10px rgba(34,197,94,0); } 100% { transform:scale(1); box-shadow:0 0 0 0 rgba(34,197,94,0); } }
       `}</style>
       <style jsx>{`
-        .map-container { height:100%; width:100%; min-height:calc(100vh - 80px); background-color:var(--bg-dark); }
+        .map-container { height:100%; width:100%; min-height:300px; background-color:var(--bg-dark); overscroll-behavior:none; touch-action:none; }
       `}</style>
     </>
   );

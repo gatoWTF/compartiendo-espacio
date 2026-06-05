@@ -1,6 +1,6 @@
 'use client';
-import { useState, useEffect, use as usePromise } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '@parkings/supabase-db';
 import { toast } from 'react-hot-toast';
 
@@ -17,8 +17,8 @@ function Estrellas({ n, size = '0.9rem' }) {
   );
 }
 
-export default function EstacionamientoDetalle({ params }) {
-  const { id } = usePromise(params);
+export default function EstacionamientoDetalle() {
+  const { id } = useParams();
   const router = useRouter();
   const [parking, setParking]   = useState(null);
   const [reviews, setReviews]   = useState([]);
