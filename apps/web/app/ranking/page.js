@@ -180,7 +180,7 @@ export default function RankingPage() {
                     <article key={p.id} className={`podio-card pos-${realIdx}`} onClick={() => irAlMapa(p)} style={{ '--medal': MEDALLAS[realIdx] }}>
                       <div className="medal"><span>{realIdx + 1}</span></div>
                       {p.photos?.[0]
-                        ? <img src={p.photos[0]} alt={p.nombre} className="podio-img" />
+                        ? <img src={p.photos[0]} alt={p.nombre} className="podio-img" onError={e => { e.target.replaceWith(Object.assign(document.createElement('div'), { className: 'podio-img placeholder', innerHTML: '<i class="fa-solid fa-square-parking"></i>' })); }} />
                         : <div className="podio-img placeholder"><i className="fa-solid fa-square-parking"></i></div>}
                       <h3>{p.nombre}</h3>
                       <p className="podio-comuna"><i className="fa-solid fa-location-dot"></i> {p.comuna}</p>
@@ -206,7 +206,7 @@ export default function RankingPage() {
                     <article key={p.id} className="rank-row" onClick={() => irAlMapa(p)}>
                       <span className="rank-pos">#{i + 4}</span>
                       {p.photos?.[0]
-                        ? <img src={p.photos[0]} alt={p.nombre} className="row-img" />
+                        ? <img src={p.photos[0]} alt={p.nombre} className="row-img" onError={e => { e.target.replaceWith(Object.assign(document.createElement('div'), { className: 'row-img placeholder', innerHTML: '<i class="fa-solid fa-square-parking"></i>' })); }} />
                         : <div className="row-img placeholder"><i className="fa-solid fa-square-parking"></i></div>}
                       <div className="row-info">
                         <h4>{p.nombre}</h4>

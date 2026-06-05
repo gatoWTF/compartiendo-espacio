@@ -72,6 +72,11 @@ function MapaPageInner() {
   // ── Lightbox de fotos (galería ampliada) ──
   const [lightbox, setLightbox] = useState(null); // { photos: [], index: 0 }
 
+  // ── Reseñas del estacionamiento seleccionado ──
+  const [reviews, setReviews]         = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsOpen, setReviewsOpen] = useState(false);
+
   // Teclado para el lightbox: Esc cierra, flechas navegan
   useEffect(() => {
     if (!lightbox) return;
@@ -87,6 +92,16 @@ function MapaPageInner() {
   // ── Favoritos ──
   const [favIds, setFavIds] = useState(new Set());
   const [favLoading, setFavLoading] = useState(false);
+
+  // Cargar reseñas cuando cambia el estacionamiento seleccionado
+  useEffect(() => {
+    if (!state.selectedSpot) { setReviews([]); setReviewsOpen(false); return; }
+    setReviewsLoading(true);
+    fetch(`/api/reseñas?estacionamiento_id=${state.selectedSpot.id}`)
+      .then(r => r.json())
+      .then(res => { if (res.success) setReviews(res.data || []); })
+      .finally(() => setReviewsLoading(false));
+  }, [state.selectedSpot?.id]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -433,7 +448,7 @@ function MapaPageInner() {
                       onClick={() => setLightbox({ photos: state.selectedSpot.photos, index: i })}
                       aria-label={`Ampliar foto ${i + 1}`}
                     >
-                      <img src={url} alt={`Foto ${i+1}`} className="spot-photo" loading="lazy" />
+                      <img src={url} alt={`Foto ${i+1}`} className="spot-photo" loading="lazy" onError={e => { e.target.closest('.spot-photo-btn').style.display = 'none'; }} />
                       <span className="spot-photo-zoom"><i className="fa-solid fa-magnifying-glass-plus"></i></span>
                     </button>
                   ))}
@@ -491,6 +506,70 @@ function MapaPageInner() {
                   </div>
                 );
               })()}
+
+              {/* ── RESEÑAS ── */}
+              <div className="reviews-section">
+                <button className="reviews-toggle" onClick={() => setReviewsOpen(v => !v)}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <i className="fa-solid fa-comments" style={{ color: '#3b82f6' }}></i>
+                    <strong>Reseñas</strong>
+                    {state.selectedSpot.reviews_count > 0 && (
+                      <span className="reviews-count-badge">{state.selectedSpot.reviews_count}</span>
+                    )}
+                    {state.selectedSpot.rating > 0 && (
+                      <span style={{ color: '#fbbf24', fontSize: '0.78rem', fontWeight: 700 }}>
+                        <i className="fa-solid fa-star" style={{ fontSize: '0.7rem' }}></i> {Number(state.selectedSpot.rating).toFixed(1)}
+                      </span>
+                    )}
+                  </span>
+                  <i className={`fa-solid fa-chevron-${reviewsOpen ? 'up' : 'down'}`} style={{ color: '#475569', fontSize: '0.75rem' }}></i>
+                </button>
+
+                {reviewsOpen && (
+                  <div className="reviews-body">
+                    {reviewsLoading ? (
+                      <div className="reviews-loading"><i className="fa-solid fa-spinner fa-spin"></i> Cargando...</div>
+                    ) : reviews.length === 0 ? (
+                      <div className="reviews-empty">
+                        <i className="fa-regular fa-comment-dots"></i>
+                        <p>Aún no hay reseñas. ¡Sé el primero!</p>
+                      </div>
+                    ) : (
+                      <div className="reviews-list">
+                        {reviews.map((r, i) => {
+                          const nombre = r.perfiles?.nombre ? `${r.perfiles.nombre}${r.perfiles.apellido ? ' ' + r.perfiles.apellido[0] + '.' : ''}` : 'Usuario';
+                          const fecha = new Date(r.created_at).toLocaleDateString('es-CL', { month: 'short', year: 'numeric' });
+                          return (
+                            <div key={i} className="review-card">
+                              <div className="review-header">
+                                <div className="review-avatar">{nombre[0].toUpperCase()}</div>
+                                <div className="review-meta">
+                                  <strong>{nombre}</strong>
+                                  <span className="review-date">{fecha}</span>
+                                </div>
+                                <div className="review-stars">
+                                  {[1,2,3,4,5].map(s => (
+                                    <i key={s} className={`fa-${s <= r.calificacion ? 'solid' : 'regular'} fa-star`} style={{ color: s <= r.calificacion ? '#fbbf24' : '#1e293b', fontSize: '0.7rem' }}></i>
+                                  ))}
+                                </div>
+                              </div>
+                              {r.comentario && <p className="review-text">{r.comentario}</p>}
+                              {r.review_photo_url && (
+                                <img
+                                  src={r.review_photo_url}
+                                  alt="Foto de reseña"
+                                  className="review-photo"
+                                  onError={e => { e.target.style.display = 'none'; }}
+                                />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
 
               <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
@@ -884,6 +963,28 @@ function MapaPageInner() {
         .spot-photo-btn:hover .spot-photo { transform: scale(1.08); }
         .spot-photo-zoom { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: white; font-size: 1.1rem; background: rgba(2,6,23,0.45); opacity: 0; transition: opacity 0.25s; border-radius: 10px; }
         .spot-photo-btn:hover .spot-photo-zoom { opacity: 1; }
+
+        /* === REVIEWS === */
+        .reviews-section { margin: 12px 0; border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; overflow: hidden; }
+        .reviews-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: rgba(15,23,42,0.6); border: none; cursor: pointer; color: #e2e8f0; font-size: 0.85rem; transition: background 0.2s; }
+        .reviews-toggle:hover { background: rgba(15,23,42,0.9); }
+        .reviews-count-badge { background: rgba(59,130,246,0.2); color: #60a5fa; font-size: 0.7rem; font-weight: 800; padding: 2px 8px; border-radius: 99px; }
+        .reviews-body { background: rgba(2,6,23,0.4); max-height: 280px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #1e293b transparent; }
+        .reviews-loading { text-align: center; padding: 20px; color: #475569; font-size: 0.82rem; }
+        .reviews-empty { text-align: center; padding: 24px 16px; color: #334155; }
+        .reviews-empty i { font-size: 1.5rem; display: block; margin-bottom: 8px; }
+        .reviews-empty p { margin: 0; font-size: 0.8rem; }
+        .reviews-list { display: flex; flex-direction: column; gap: 0; }
+        .review-card { padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+        .review-card:last-child { border-bottom: none; }
+        .review-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+        .review-avatar { width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg,#2563eb,#10b981); color: white; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 800; flex-shrink: 0; }
+        .review-meta { flex: 1; }
+        .review-meta strong { display: block; font-size: 0.8rem; color: #e2e8f0; }
+        .review-date { font-size: 0.7rem; color: #475569; }
+        .review-stars { display: flex; gap: 2px; }
+        .review-text { margin: 0; font-size: 0.8rem; color: #94a3b8; line-height: 1.5; }
+        .review-photo { width: 100%; max-height: 120px; object-fit: cover; border-radius: 8px; margin-top: 8px; }
 
         /* === LIGHTBOX === */
         .lightbox-overlay { position: fixed; inset: 0; z-index: 5000; background: rgba(2,6,23,0.92); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; padding: 40px; animation: lbFade 0.25s ease; cursor: zoom-out; }
