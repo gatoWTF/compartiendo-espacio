@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { NextResponse } from 'next/server';
+import { rateLimit, clientIp } from '../../../../src/lib/rateLimit';
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -115,6 +116,16 @@ function requiresEscalation(text) {
 
 export async function POST(request) {
   try {
+    // Rate limit: este endpoint es público y llama a una API de pago (Anthropic),
+    // así que limitamos por IP para evitar abuso / amplificación de costo.
+    const { ok } = rateLimit(`chat:${clientIp(request)}`, { max: 20, windowMs: 60_000 });
+    if (!ok) {
+      return NextResponse.json(
+        { reply: 'Estás enviando mensajes muy rápido. Espera un momento e intenta de nuevo.' },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const { messages } = body;
 

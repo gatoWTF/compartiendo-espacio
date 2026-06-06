@@ -1,25 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getServiceSupabase } from '@parkings/supabase-db';
+import { rateLimit, clientIp } from '../../../../src/lib/rateLimit';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PW_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()\-_=+[\]{};':",.<>/?`~\\|]).{8,}$/;
 
-const ipCounts = new Map();
-const WINDOW_MS = 60 * 60 * 1000;
-const MAX_PER_WINDOW = 10;
-
-function checkRateLimit(ip) {
-  const now = Date.now();
-  const entry = ipCounts.get(ip);
-  if (!entry || now - entry.start > WINDOW_MS) { ipCounts.set(ip, { start: now, count: 1 }); return true; }
-  entry.count++;
-  return entry.count <= MAX_PER_WINDOW;
-}
-
 export async function POST(request) {
   try {
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-    if (!checkRateLimit(ip)) {
+    // Máximo 10 registros por IP por hora (mitiga creación masiva de cuentas).
+    const { ok } = rateLimit(`signup:${clientIp(request)}`, { max: 10, windowMs: 60 * 60 * 1000 });
+    if (!ok) {
       return NextResponse.json({ error: 'Demasiados intentos. Espera unos minutos.' }, { status: 429 });
     }
 
