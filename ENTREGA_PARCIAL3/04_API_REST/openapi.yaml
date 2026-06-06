@@ -1,0 +1,191 @@
+openapi: 3.0.3
+info:
+  title: Parkings Together — API REST
+  version: "3.0.0"
+  description: |
+    Especificación de la API REST del sistema **Parkings Together**.
+    El **BFF** (apps/web) expone rutas de mismo origen que orquestan los
+    microservicios y la persistencia. Cada microservicio expone además su
+    propia API REST versionada en `/api/v1/*`.
+
+    Autenticación: **Bearer JWT** (token de Supabase Auth) en operaciones de
+    escritura; las lecturas públicas no requieren token (RLS `USING (true)`).
+servers:
+  - url: https://parkings-web.vercel.app
+    description: Producción (BFF)
+  - url: http://localhost:3000
+    description: BFF local
+  - url: http://localhost:3002
+    description: ms-mapas
+  - url: http://localhost:3003
+    description: ms-reservas
+  - url: http://localhost:3001
+    description: auth
+
+tags:
+  - name: Mapas
+  - name: Reservas
+  - name: Reseñas
+  - name: Auth
+
+paths:
+  /api/mapas/search:
+    get:
+      tags: [Mapas]
+      summary: Buscar estacionamientos (detalle por id, por radio o por filtros)
+      parameters:
+        - { name: id, in: query, schema: { type: integer }, description: Detalle puntual }
+        - { name: lat, in: query, schema: { type: number } }
+        - { name: lng, in: query, schema: { type: number } }
+        - { name: radius, in: query, schema: { type: number }, description: Radio en km }
+        - { name: comuna, in: query, schema: { type: string } }
+        - { name: pmr, in: query, schema: { type: boolean } }
+        - { name: disponible, in: query, schema: { type: boolean } }
+        - { name: precioMax, in: query, schema: { type: integer } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              examples:
+                porRadio:
+                  summary: Búsqueda por radio
+                  value:
+                    success: true
+                    data:
+                      - { id: 47, nombre: "Hola, soy una prueba", lat: -33.4056, lng: -70.6391, total_spots: 999, occupied_spots: 0, precio_hora: 999, es_pmr: true, comuna: "Santiago" }
+    post:
+      tags: [Mapas]
+      summary: Crear estacionamiento (arrendador)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              nombre: "Estacionamiento Centro"
+              lat: -33.4372
+              lng: -70.6506
+              totalSpots: 20
+              precioHora: 1500
+              esPmr: false
+              allowedVehicleTypes: ["car", "motorcycle"]
+      responses:
+        "201": { description: Creado }
+        "401": { description: No autenticado }
+        "403": { description: RLS — el usuario no es arrendador }
+    patch:
+      tags: [Mapas]
+      summary: Actualizar ocupación / datos / activar (acciones)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            examples:
+              ocupacion: { value: { id: 47, occupied_spots: 3 } }
+              updateFull: { value: { action: "updateFull", id: 47, precioHora: 2000 } }
+              toggle: { value: { action: "toggleActivo", id: 47 } }
+      responses: { "200": { description: OK } }
+    delete:
+      tags: [Mapas]
+      summary: Eliminar (soft/hard) estacionamientos del usuario
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content: { application/json: { example: { ids: [47, 48] } } }
+      responses: { "200": { description: OK } }
+
+  /api/reservas/reserve:
+    get:
+      tags: [Reservas]
+      summary: Verificar disponibilidad de una plaza
+      parameters: [{ name: parkingId, in: query, schema: { type: integer } }]
+      responses:
+        "200":
+          content:
+            application/json:
+              example: { success: true, available: true, spots_left: 996 }
+    post:
+      tags: [Reservas]
+      summary: Crear reserva (Saga + CQRS)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            example:
+              parking_id: 47
+              spot_label: "A-12"
+              duration_hours: 2
+              fecha_inicio: "2026-06-06T12:00:00Z"
+              fecha_fin: "2026-06-06T14:00:00Z"
+      responses:
+        "201":
+          content:
+            application/json:
+              example: { success: true, reserva_id: "26621dbc-...", estado: "activa" }
+        "409": { description: Sin cupo (rechazo CQRS) }
+
+  /api/resenas:
+    get:
+      tags: [Reseñas]
+      summary: Reseñas públicas de un estacionamiento (vía SP obtener_resenas)
+      parameters: [{ name: estacionamiento_id, in: query, required: true, schema: { type: integer } }]
+      responses:
+        "200":
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  - { id: "26621dbc-...", calificacion: 5, comentario: "Excelente ubicación", created_at: "2026-06-05T15:40:40Z", perfil: { nombre: "Jefferson", apellido: "Rojas" } }
+                resumen: { total: 1, promedio: 5, distribucion: { "5": 1 } }
+
+  /api/v1/reserve:
+    post:
+      tags: [Reservas]
+      summary: "[ms-reservas] Reserva directa al microservicio (Saga)"
+      requestBody:
+        content:
+          application/json:
+            example: { parking_id: 47, user_id: "u-123", duration_hours: 1 }
+      responses: { "201": { description: Reserva creada } }
+
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: "[auth] Inicio de sesión"
+      requestBody:
+        content:
+          application/json:
+            example: { email: "user@mail.com", password: "••••••••" }
+      responses:
+        "200":
+          content:
+            application/json:
+              example: { success: true, access_token: "eyJhbGci...", user: { id: "u-123" } }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Estacionamiento:
+      type: object
+      properties:
+        id: { type: integer }
+        nombre: { type: string }
+        lat: { type: number }
+        lng: { type: number }
+        total_spots: { type: integer }
+        occupied_spots: { type: integer }
+        precio_hora: { type: integer }
+        es_pmr: { type: boolean }
+        comuna: { type: string }
+    Reserva:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        estacionamiento_id: { type: integer }
+        conductor_id: { type: string, format: uuid }
+        estado: { type: string, enum: [pendiente, confirmada, activa, completada, cancelada] }

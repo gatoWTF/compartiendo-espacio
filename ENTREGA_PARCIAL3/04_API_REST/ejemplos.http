@@ -1,0 +1,69 @@
+### Parkings Together — Ejemplos de peticiones API REST
+### Compatible con la extensión "REST Client" de VS Code. También sirve como
+### referencia curl. Respuestas reales verificadas contra producción.
+
+@host = https://parkings-web.vercel.app
+
+### 1) Buscar estacionamientos por radio (lectura pública, sin token)
+GET {{host}}/api/mapas/search?lat=-33.405&lng=-70.639&radius=5
+# 200 OK
+# { "success": true, "data": [ { "id": 47, "nombre": "Hola, soy una prueba",
+#   "lat": -33.405575, "lng": -70.639056, "total_spots": 999, "occupied_spots": 0,
+#   "precio_hora": 999, "es_pmr": true, "comuna": "Santiago" }, ... ] }
+
+### 2) Detalle de un estacionamiento por id
+GET {{host}}/api/mapas/search?id=47
+# 200 OK → objeto único del estacionamiento 47
+
+### 3) Reseñas públicas de un estacionamiento (vía Stored Procedure obtener_resenas)
+GET {{host}}/api/resenas?estacionamiento_id=47
+# 200 OK
+# { "success": true,
+#   "data": [ { "id": "26621dbc-...", "calificacion": 5,
+#               "comentario": "ME HICIERON BOLSA LA BICICLETA ...",
+#               "perfil": { "nombre": "Jefferson Rojas", "apellido": "Rojas" } } ],
+#   "resumen": { "total": 1, "promedio": 5, "distribucion": { "5": 1 } } }
+
+### 4) Verificar disponibilidad antes de reservar
+GET {{host}}/api/reservas/reserve?parkingId=47
+# 200 OK → { "success": true, "available": true, "spots_left": 999 }
+
+### 5) Crear un estacionamiento (requiere JWT de un usuario ARRENDADOR)
+POST {{host}}/api/mapas/search
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "nombre": "Estacionamiento Plaza de Armas",
+  "lat": -33.4372,
+  "lng": -70.6506,
+  "totalSpots": 20,
+  "precioHora": 1500,
+  "esPmr": false,
+  "allowedVehicleTypes": ["car", "motorcycle"]
+}
+# 201 Created → { "success": true, "data": { "id": 49, ... } }
+# 403 Forbidden si el usuario no tiene rol 'arrendador' (bloqueado por RLS)
+
+### 6) Crear una reserva (Saga + CQRS, requiere JWT)
+POST {{host}}/api/reservas/reserve
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "parking_id": 47,
+  "spot_label": "A-12",
+  "duration_hours": 2,
+  "fecha_inicio": "2026-06-06T12:00:00Z",
+  "fecha_fin":    "2026-06-06T14:00:00Z"
+}
+# 201 Created → { "success": true, "reserva_id": "....", "estado": "activa" }
+# 409 Conflict  → { "success": false, "error": "El estacionamiento ya está lleno." }
+
+### 7) Actualizar ocupación de una plaza (panel arrendador)
+PATCH {{host}}/api/mapas/search
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{ "id": 47, "occupied_spots": 3 }
+# 200 OK → reflejado en tiempo real en el mapa (semáforo de disponibilidad)
