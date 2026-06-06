@@ -1,8 +1,14 @@
-// apps/web/app/api/reseñas/route.js
+// apps/web/app/api/resenas/route.js
 //
 // Reseñas públicas de un estacionamiento.
 //
-// IMPORTANTE (causa raíz del bug "Estacionamiento no encontrado"):
+// NOTA: la ruta se llama `resenas` (sin ñ) a propósito. La carpeta anterior
+// `reseñas` (con ñ) provocaba que el build incremental de Vercel NO detectara
+// los cambios del route (reutilizaba la función serverless cacheada), además
+// de obligar a URLs codificadas como /api/rese%C3%B1as. Usar ASCII elimina esa
+// clase de fragilidad por completo.
+//
+// CAUSA RAÍZ del bug "Estacionamiento no encontrado":
 // La versión anterior creaba un cliente con SUPABASE_SERVICE_ROLE_KEY en cada
 // request. Si esa variable no estaba configurada en el entorno, supabase-js
 // lanzaba "supabaseKey is required" SIN try/catch → respuesta 500 con HTML.

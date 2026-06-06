@@ -134,7 +134,7 @@ function MapaPageInner() {
     setSheetHeight(null); // reset drag height on new spot
     if (!state.selectedSpot) { setReviews([]); setReviewsOpen(false); return; }
     setReviewsLoading(true);
-    fetch(`/api/reseñas?estacionamiento_id=${state.selectedSpot.id}`)
+    fetch(`/api/resenas?estacionamiento_id=${state.selectedSpot.id}`)
       .then(r => r.json())
       .then(res => { if (res.success) setReviews(res.data || []); })
       .finally(() => setReviewsLoading(false));

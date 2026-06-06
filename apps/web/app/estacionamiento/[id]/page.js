@@ -48,7 +48,7 @@ export default function EstacionamientoDetalle() {
     // 2) Reseñas — petición totalmente independiente. Si falla, la ficha del
     //    estacionamiento se muestra igual (solo no aparecen las reseñas).
     try {
-      const res = await fetch(`/api/reseñas?estacionamiento_id=${id}`);
+      const res = await fetch(`/api/resenas?estacionamiento_id=${id}`);
       const rRes = await res.json();
       if (rRes.success) {
         setReviews(rRes.data || []);
