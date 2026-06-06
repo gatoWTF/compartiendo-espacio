@@ -10,8 +10,16 @@ const QUICK_QUESTIONS = [
   '¿Cómo cancelo una reserva?',
 ];
 
+// Renderiza un subconjunto mínimo de Markdown (negrita y saltos de línea) a HTML.
+// SEGURIDAD: escapa primero las entidades HTML para evitar XSS — el texto puede
+// venir del usuario o de la respuesta de la IA, así que jamás debe interpretarse
+// como HTML crudo. Tras escapar, solo se reintroducen <strong> y <br/> seguros.
 function renderMarkdown(text) {
-  return text
+  const escaped = String(text ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  return escaped
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\n/g, '<br/>');
 }
