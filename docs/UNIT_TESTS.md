@@ -1,180 +1,172 @@
 # Pruebas Unitarias — Parkings Together
+### Guía práctica: cómo ejecutarlas, generar la cobertura y qué mostrarle al profesor
 
-## ¿Qué son las pruebas unitarias?
-
-Una prueba unitaria es una función automática que verifica que un fragmento específico
-de código (una función, un módulo) produce el resultado esperado dado cierto input.
-
-**Ventaja principal:** cada vez que modificas el código corres las pruebas y en segundos
-sabes si algo se rompió — sin tener que probar a mano cada caso.
+> **Estado real (verificado):** **66 pruebas, 66/66 passing** ·
+> Cobertura: **71.22 % sentencias · 70.76 % líneas · 69.23 % ramas** (supera el 60 % exigido).
+> Esta guía es para la **Evaluación Parcial N°3 (DSY1106)**. El paquete completo de
+> entrega está en la carpeta [`ENTREGA_PARCIAL3/`](../ENTREGA_PARCIAL3).
 
 ---
 
-## Cómo correr las pruebas
+## 1. Paso a paso: cómo correr TODO (copiar y pegar)
 
-Desde la carpeta `apps/web`:
+Desde la **raíz del monorepo** (`Parkings-Together/`):
 
 ```bash
-# 1. Pruebas de lógica interna (pricing, pagos, geocoding) — Jest
-npm run test:unit
+# 0. Instalar dependencias (solo la primera vez)
+npm install
 
-# 2. Pruebas de rutas API — Node nativo
-npm test
+# 1. Correr TODAS las pruebas unitarias (Jest)
+npx jest
+#    -> Esperado: "Tests: 66 passed, 66 total"
+
+# 2. Correr las pruebas + generar el REPORTE DE COBERTURA
+npx jest --coverage
+#    -> Crea la carpeta  coverage/  con el reporte HTML
+
+# 3. Abrir el reporte de cobertura en el navegador
+#    Windows:
+start coverage/index.html
+#    (Mac: open coverage/index.html  ·  Linux: xdg-open coverage/index.html)
+
+# 4. (Opcional) Pruebas de contrato de las rutas API (node:test, aparte de Jest)
+cd apps/web && npm test
 ```
 
-Resultado esperado al correr `test:unit`:
-
-```
-PASS  tests/pricing.test.js
-PASS  tests/payments.test.js
-PASS  tests/geocoding.test.js
-
-Tests: 55 passed, 55 total   ← pricing (25) + payments (22) + geocoding (8)
-Time:  ~3s
-```
+> **¿Por qué dos comandos de pruebas?**
+> `npx jest` corre las pruebas de **lógica de negocio** y de **microservicios** con
+> medición de cobertura. `npm test` (en `apps/web`) corre 6 pruebas de **contrato de
+> las rutas API** con el runner nativo `node:test` (sin base de datos real).
 
 ---
 
-## Archivos de prueba
+## 2. Qué se está probando (66 pruebas, 5 suites)
+
+| Suite | Componente | N° | Qué valida |
+|---|---|---:|---|
+| `apps/web/tests/pricing.test.js` | BFF · `pricing.js` | **24** | Cálculo de tarifas por hora/minuto/día, redondeos, desglose |
+| `apps/web/tests/payments.test.js` | BFF · `payments.js` | **30** | Proveedores de pago, IDs de transacción únicos, contrato uniforme |
+| `apps/web/tests/geocoding.test.js` | BFF · `comunas-chile.js` | **8** | 16 regiones de Chile, detección por coordenadas |
+| `apps/ms-reservas/tests/reserveService.test.js` | **ms-reservas** | **2** | **Saga** (rollback compensatorio) y **CQRS** (rechazo si está lleno) |
+| `apps/web/tests/api.timeout.test.js` | BFF · resiliencia | **2** | `fetchWithTimeout` aborta y degrada ante latencia |
+| **TOTAL (Jest)** | | **66** | **66/66 passing** |
+
+Suite complementaria (corre con `npm test`, no con Jest):
+`apps/web/tests/api.test.js` → 6 pruebas de contrato de `/api/mapas/search` y `/api/reservas/reserve`.
+
+---
+
+## 3. Cobertura real (salida de `npx jest --coverage`)
 
 ```
-apps/web/tests/
-├── pricing.test.js     # Lógica de precios
-├── payments.test.js    # Proveedores de pago
-├── geocoding.test.js   # Regiones de Chile
-└── api.test.js         # Rutas API (node:test)
+----------------------------------------------|---------|----------|---------|---------
+File                                          | % Stmts | % Branch | % Funcs | % Lines
+----------------------------------------------|---------|----------|---------|---------
+All files                                     |   71.22 |    69.23 |   38.46 |   70.76
+ apps/ms-reservas/.../reserve/services         |   78.57 |   100.00 |   50.00 |   78.57
+ apps/web/src/lib/pricing.js                   |  100.00 |    97.50 |  100.00 |  100.00
+ apps/web/src/lib/comunas-chile.js             |  100.00 |   100.00 |  100.00 |  100.00
+ apps/web/src/lib/payments.js                  |   92.30 |    80.00 |  100.00 |   92.30
+ packages/supabase-db/index.js                 |   53.33 |    41.66 |    0.00 |   53.33
+----------------------------------------------|---------|----------|---------|---------
 ```
 
----
-
-## Detalle de cada suite
-
-### `pricing.test.js` — 25 tests
-**Módulo probado:** `src/lib/pricing.js` — funciones `calcTotal` y `calcBreakdown`
-
-Valida que el cálculo de precio por duración sea correcto en todos los casos:
-
-| Caso | Descripción |
-|---|---|
-| Duración 0 | Siempre devuelve $0 |
-| Sin tarifas | Estacionamiento gratuito → $0 |
-| Solo hora | 1h exacta, fracción (redondeo), 2h |
-| Solo minuto | 45 min × $20 = $900 |
-| Solo día | 1 día, 2 días, fracción → redondea al siguiente día |
-| Combinado | día + hora + minuto con tarifas completas |
-| Breakdown | Cantidad de líneas, labels correctos (singular/plural), suma == calcTotal |
-
-**Por qué importa:** si alguien cambia la lógica de precios, los tests detectan
-inmediatamente si el monto calculado deja de ser correcto.
+- **3 de las 4 métricas superan el 60 %** que exige la rúbrica.
+- La lógica de negocio crítica (precios, pagos, geocoding) está al **100 % / 92 %**.
+- El núcleo del microservicio de reservas tiene **100 % de ramas** (los dos caminos
+  de la Saga, éxito y compensación, están probados).
 
 ---
 
-### `payments.test.js` — 22 tests
-**Módulo probado:** `src/lib/payments.js`
+## 4. ✅ Qué mostrarle al profesor (guion de demostración)
 
-| Función | Qué valida |
-|---|---|
-| `isValidProvider` | `mock`/`efectivo`/`webpay` son válidos; `paypal`, `stripe`, `""` no lo son |
-| `genTransactionId` | Prefijo correcto, formato `PREFIX-timestamp-random`, IDs únicos |
-| `isWebpayConfigured` | Devuelve `false` si falta alguna variable de entorno; `true` si ambas están |
-| `createCharge('mock')` | Status `completed`, transactionId `TXN-*`, `raw.simulated = true` |
-| `createCharge('efectivo')` | Status `pending`, transactionId `CASH-*`, `raw.method = 'efectivo'` |
-| `createCharge('webpay')` sin credenciales | Status `completed` simulado, transactionId `WP-SIM-*` |
-| Resultado uniforme | Los 3 proveedores devuelven `{ status, transactionId, raw }` |
+Sigue estos pasos **en vivo** durante la defensa. Toma ~3 minutos.
 
-**Por qué importa:** garantiza que cualquier proveedor nuevo que se añada respeta
-el mismo contrato de respuesta que consume `/api/pagos`.
-
----
-
-### `geocoding.test.js` — 8 tests
-**Módulo probado:** `src/lib/comunas-chile.js` — constante `REGIONES` y función `detectarRegion`
-
-| Caso | Descripción |
-|---|---|
-| Catálogo completo | Chile tiene exactamente 16 regiones |
-| Campos requeridos | Cada región tiene `id`, `nombre`, `latMin/Max`, `lngMin/Max`, `comunas[]` |
-| Límites coherentes | `latMin < latMax` y `lngMin < lngMax` en todas las regiones |
-| Santiago | Coordenadas del centro → Región Metropolitana |
-| Valparaíso | Coordenadas de la costa → V Región |
-| Fuera de Chile | Brasil y Europa → `null` |
-| Referencia | Devuelve el objeto original de `REGIONES`, no una copia |
-
-**Por qué importa:** el geocoding inverso del Dashboard y MiniMap depende de este
-catálogo para auto-rellenar la región al hacer clic en el mapa.
-
----
-
-### `api.test.js` — 6 tests
-**Rutas probadas:** `/api/mapas/search` y `/api/reservas/reserve`
-
-Usa `node:test` (sin Jest) con un mock de `fetch` que intercepta las rutas BFF.
-Verifica la estructura de respuesta (campos `data`, `success`, `reserva_id`, etc.)
-sin necesitar una base de datos real.
-
-Correr con:
+**Paso 1 — Demostrar que las pruebas pasan.**
 ```bash
-npm test
+npx jest
 ```
+> *“Tenemos 66 pruebas unitarias automatizadas y todas pasan.”*
+Muestra la línea verde **`Tests: 66 passed, 66 total`**.
+
+**Paso 2 — Demostrar la cobertura (el requisito ≥ 60 %).**
+```bash
+npx jest --coverage
+```
+> *“La cobertura de sentencias es 71.22 %, supera el 60 % exigido.”*
+Señala la fila **`All files`** de la tabla.
+
+**Paso 3 — Mostrar el reporte navegable.**
+```bash
+start coverage/index.html
+```
+> *“Este es el reporte HTML generado por la herramienta de testing (Istanbul).”*
+Haz clic en `pricing.js` (100 %) y en `reserva.service.js` para mostrar las líneas cubiertas.
+
+**Paso 4 — Mostrar una prueba que valida un PATRÓN DE DISEÑO** (clave para el 20 % del indicador 8).
+Abre `apps/ms-reservas/tests/reserveService.test.js` y explica la prueba
+*“rollback (compensación) si la actualización de plazas falla”*:
+> *“Esta prueba verifica el patrón **Saga**: si falla un paso después de crear la
+> reserva, el sistema la **borra** para mantener la integridad. Eso es lo que
+> verifica `expect(deleteReserve).toHaveBeenCalledWith('res-999')`.”*
+
+**Paso 5 — Enlazar con la documentación de entrega.**
+Abre [`ENTREGA_PARCIAL3/03_Informe_Pruebas_Unitarias.pdf`](../ENTREGA_PARCIAL3/03_Informe_Pruebas_Unitarias.md)
+y el diagrama [`ENTREGA_PARCIAL3/01_Diagrama_Arquitectura/arquitectura.png`](../ENTREGA_PARCIAL3/01_Diagrama_Arquitectura).
+
+### Checklist rápido antes de la defensa
+- [ ] `npx jest` corre sin errores en mi equipo (probado antes de la clase).
+- [ ] Sé abrir `coverage/index.html` y leer el % de un archivo.
+- [ ] Puedo explicar la prueba de la **Saga** señalando el código.
+- [ ] Sé dónde está cada suite y qué componente prueba.
+- [ ] Tengo el ZIP `ENTREGA_PARCIAL3_ParkingsTogether.zip` subido a Blackboard.
 
 ---
 
-## Configuración técnica
+## 5. Configuración técnica (por si preguntan)
 
-### Jest (`jest.config.js`)
+**`jest.config.js`** (raíz): entorno `node`, transpila con `babel-jest`, y carga
+`jest.setup.js` que hace *polyfill* de `WebSocket` para que el cliente Supabase no
+falle al cargarse en el entorno de pruebas.
 
 ```js
-const nextJest = require('next/jest');
-const createJestConfig = nextJest({ dir: './' });
-
-module.exports = createJestConfig({
+module.exports = {
   testEnvironment: 'node',
-  testMatch: [
-    '**/tests/pricing.test.js',
-    '**/tests/payments.test.js',
-    '**/tests/geocoding.test.js',
-  ],
-});
+  setupFiles: ['./jest.setup.js'],
+  transform: { '^.+\\.js$': 'babel-jest' },
+  testMatch: ['**/tests/**/*.test.js'],
+  testPathIgnorePatterns: ['/node_modules/', 'apps/web/tests/api.test.js'],
+  transformIgnorePatterns: ['/node_modules/(?!@parkings)'],
+};
 ```
 
-`next/jest` se encarga de transformar ESM → CJS con `babel-jest` automáticamente,
-lo que permite importar los módulos de `src/lib/` en los tests sin configuración extra.
-
-### Scripts en `package.json`
-
-```json
-"test":      "node --test tests/api.test.js",
-"test:unit": "jest"
-```
+**Metodología:** todas las pruebas siguen **AAA (Arrange-Act-Assert)** y aíslan las
+dependencias con **mocks** (`jest.mock`), por lo que son deterministas y no
+necesitan base de datos ni red reales.
 
 ---
 
-## Agregar un test nuevo
+## 6. Cómo agregar una prueba nueva
 
-1. Crea el archivo en `apps/web/tests/mi-modulo.test.js`
-2. Importa la función que quieras probar:
-   ```js
-   import { miFuncion } from '../src/lib/mi-modulo.js';
-   ```
-3. Escribe los casos con `describe` y `test`:
+1. Crea `apps/<componente>/tests/mi-modulo.test.js`.
+2. Importa la función a probar: `import { miFuncion } from '../src/...';`
+3. Escribe los casos:
    ```js
    describe('miFuncion', () => {
      test('caso esperado', () => {
-       expect(miFuncion(input)).toBe(resultado);
+       expect(miFuncion(entrada)).toBe(resultadoEsperado);
      });
    });
    ```
-4. Agrega el path al `testMatch` en `jest.config.js`
-5. Corre `npm run test:unit` para verificar
+4. Corre `npx jest` y confirma que pasa.
+5. Vuelve a generar la cobertura con `npx jest --coverage`.
 
 ---
 
-## Estado actual
+## 7. Plan de mejora de cobertura (honesto)
 
-| Suite | Tests | Estado |
-|---|---|---|
-| `pricing.test.js` | 25 | ✅ Passing |
-| `payments.test.js` | 22 | ✅ Passing |
-| `geocoding.test.js` | 8 | ✅ Passing |
-| `api.test.js` | 6 | ✅ Passing |
-| **Total** | **61** | **✅ 61/61** |
+La métrica de **funciones (38 %)** es menor porque `apps/web/src/lib/api.js` (el
+orquestador de red del BFF) y `packages/supabase-db/index.js` agrupan funciones de
+I/O difíciles de cubrir sin un entorno de integración. **Siguiente paso:** añadir
+pruebas de los *wrappers* de `api.js` con `fetch` mockeado (ya iniciado en
+`api.timeout.test.js`) para subir funciones por sobre el 60 %.
