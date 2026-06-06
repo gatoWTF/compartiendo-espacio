@@ -4,7 +4,10 @@ import { createClient } from '@supabase/supabase-js';
 export async function GET(request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
-  const next = searchParams.get('next') ?? '/mapa';
+  // Solo se permiten rutas internas relativas (que empiecen con "/" pero no "//"),
+  // para evitar open-redirect a un dominio externo controlado por el atacante.
+  const nextParam = searchParams.get('next') ?? '/mapa';
+  const next = /^\/(?!\/)/.test(nextParam) ? nextParam : '/mapa';
   const error = searchParams.get('error');
   const errorDescription = searchParams.get('error_description');
 
