@@ -32,17 +32,30 @@ export default function EstacionamientoDetalle() {
   const esOwner = parking && userId && parking.user_id === userId;
 
   const cargar = async () => {
+    // 1) Estacionamiento — controla el loading y el estado "no encontrado".
+    //    Va AISLADO de las reseñas: un fallo al cargar reseñas jamás debe dejar
+    //    el parking en null (esa era la causa de "Estacionamiento no encontrado").
     try {
-      const [pRes, rRes] = await Promise.all([
-        fetch(`/api/mapas/search?id=${id}`).then(r => r.json()),
-        fetch(`/api/reseñas?estacionamiento_id=${id}`).then(r => r.json()),
-      ]);
-      if (pRes.success) setParking(pRes.data);
-      if (rRes.success) { setReviews(rRes.data || []); setResumen(rRes.resumen || { total: 0, promedio: 0, distribucion: {} }); }
+      const res = await fetch(`/api/mapas/search?id=${id}`);
+      const pRes = await res.json();
+      if (pRes.success && pRes.data) setParking(pRes.data);
     } catch {
-      // Network error: parking stays null → shows "not found" state
+      // Error de red: parking queda null → muestra estado "no encontrado".
     } finally {
       setLoading(false);
+    }
+
+    // 2) Reseñas — petición totalmente independiente. Si falla, la ficha del
+    //    estacionamiento se muestra igual (solo no aparecen las reseñas).
+    try {
+      const res = await fetch(`/api/reseñas?estacionamiento_id=${id}`);
+      const rRes = await res.json();
+      if (rRes.success) {
+        setReviews(rRes.data || []);
+        setResumen(rRes.resumen || { total: 0, promedio: 0, distribucion: {} });
+      }
+    } catch {
+      // Sin reseñas: no es crítico, la ficha sigue visible.
     }
   };
 
