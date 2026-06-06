@@ -24,10 +24,12 @@ npx jest
 npx jest --coverage
 #    -> Crea la carpeta  coverage/  con el reporte HTML
 
-# 3. Abrir el reporte de cobertura en el navegador
-#    Windows:
-start coverage/index.html
-#    (Mac: open coverage/index.html  ·  Linux: xdg-open coverage/index.html)
+# 3. Abrir el reporte de cobertura HTML en el navegador.
+#    OJO: Jest lo genera en  coverage/lcov-report/index.html  (no en coverage/index.html)
+#    Windows (PowerShell):
+Invoke-Item .\coverage\lcov-report\index.html
+#    Mac:    open coverage/lcov-report/index.html
+#    Linux:  xdg-open coverage/lcov-report/index.html
 
 # 4. (Opcional) Pruebas de contrato de las rutas API (node:test, aparte de Jest)
 cd apps/web && npm test
@@ -97,8 +99,8 @@ npx jest --coverage
 Señala la fila **`All files`** de la tabla.
 
 **Paso 3 — Mostrar el reporte navegable.**
-```bash
-start coverage/index.html
+```powershell
+Invoke-Item .\coverage\lcov-report\index.html
 ```
 > *“Este es el reporte HTML generado por la herramienta de testing (Istanbul).”*
 Haz clic en `pricing.js` (100 %) y en `reserva.service.js` para mostrar las líneas cubiertas.
@@ -116,7 +118,7 @@ y el diagrama [`ENTREGA_PARCIAL3/01_Diagrama_Arquitectura/arquitectura.png`](../
 
 ### Checklist rápido antes de la defensa
 - [ ] `npx jest` corre sin errores en mi equipo (probado antes de la clase).
-- [ ] Sé abrir `coverage/index.html` y leer el % de un archivo.
+- [ ] Sé abrir `coverage\lcov-report\index.html` y leer el % de un archivo.
 - [ ] Puedo explicar la prueba de la **Saga** señalando el código.
 - [ ] Sé dónde está cada suite y qué componente prueba.
 - [ ] Tengo el ZIP `ENTREGA_PARCIAL3_ParkingsTogether.zip` subido a Blackboard.
