@@ -21,3 +21,5 @@ yarn-error.log*
 
 # Claude Code local settings (may contain tokens)
 .claude/settings.json
+# Reportes de cobertura (regenerables con: npx jest --coverage)
+coverage/
