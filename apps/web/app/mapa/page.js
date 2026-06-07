@@ -602,7 +602,10 @@ function MapaPageInner() {
                                 <div className="review-avatar">{nombre[0].toUpperCase()}</div>
                                 <div className="review-meta">
                                   <strong>{nombre}</strong>
-                                  <span className="review-date">{fecha}</span>
+                                  <span className="review-date">
+                                    <i className="fa-solid fa-circle-check" style={{ color: '#34d399', marginRight: 3 }}></i>
+                                    Verificada · {fecha}
+                                  </span>
                                 </div>
                                 <div className="review-stars">
                                   {[1,2,3,4,5].map(s => (

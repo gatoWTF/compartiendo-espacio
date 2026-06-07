@@ -237,7 +237,11 @@ export default function EstacionamientoDetalle() {
                           : <div className="det-rev-av ph">{nombre[0].toUpperCase()}</div>}
                         <div className="det-rev-meta">
                           <strong>{nombre}</strong>
-                          <span>{fecha}</span>
+                          {/* Toda reseña proviene de una reserva COMPLETADA (lo exige la RPC
+                              calificar_reserva), así que es una visita verificada de verdad. */}
+                          <span className="det-rev-verified" title="Esta reseña la dejó un conductor que completó una reserva aquí">
+                            <i className="fa-solid fa-circle-check"></i> Visita verificada · {fecha}
+                          </span>
                         </div>
                         <Estrellas n={r.calificacion} size="0.8rem" />
                       </div>
@@ -364,6 +368,8 @@ export default function EstacionamientoDetalle() {
         .det-rev-meta { flex: 1; }
         .det-rev-meta strong { display: block; color: white; font-size: 0.9rem; }
         .det-rev-meta span { font-size: 0.74rem; color: #64748b; }
+        .det-rev-verified { display: inline-flex; align-items: center; gap: 5px; color: #34d399 !important; font-weight: 600; }
+        .det-rev-verified i { color: #34d399; font-size: 0.78rem; }
         .det-rev-text { color: #cbd5e1; line-height: 1.6; font-size: 0.88rem; margin: 0 0 10px; }
         .det-rev-photo { max-width: 220px; width: 100%; border-radius: 12px; cursor: pointer; border: 1px solid rgba(255,255,255,0.08); }
 
