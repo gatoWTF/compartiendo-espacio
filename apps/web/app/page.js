@@ -25,17 +25,22 @@ function useCountUp(target, duration = 1800) {
 export default function HomePage() {
   const router = useRouter();
   const [gpsLoading, setGpsLoading] = useState(false);
-  const [stats, setStats] = useState({ spots: 0, comunas: 0 });
+  const [stats, setStats] = useState({ spots: 0, comunas: 0, rating: 0 });
 
   useEffect(() => {
     supabase
       .from('estacionamientos')
-      .select('id, comuna')
+      .select('id, comuna, rating')
       .eq('activo', true)
       .then(({ data }) => {
         if (!data) return;
         const comunasUnicas = new Set(data.map(e => e.comuna).filter(Boolean)).size;
-        setStats({ spots: data.length, comunas: comunasUnicas });
+        // Promedio REAL de valoración (solo plazas con rating > 0). Sin dato hardcodeado.
+        const conRating = data.filter(e => Number(e.rating) > 0);
+        const promedio = conRating.length
+          ? conRating.reduce((a, e) => a + Number(e.rating), 0) / conRating.length
+          : 0;
+        setStats({ spots: data.length, comunas: comunasUnicas, rating: promedio });
       });
   }, []);
 
@@ -92,12 +97,16 @@ export default function HomePage() {
                 <span className="stat-num">{totalComunas}</span>
                 <span className="stat-label">comunas</span>
               </div>
-              <div className="stat-divider"></div>
-              <div className="stat-chip">
-                <span className="stat-dot purple"></span>
-                <span className="stat-num">4.8 estrella</span>
-                <span className="stat-label">valoracion</span>
-              </div>
+              {stats.rating > 0 && (
+                <>
+                  <div className="stat-divider"></div>
+                  <div className="stat-chip">
+                    <span className="stat-dot purple"></span>
+                    <span className="stat-num">{stats.rating.toFixed(1)} ★</span>
+                    <span className="stat-label">valoración</span>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
