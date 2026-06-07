@@ -28,6 +28,7 @@ export default function EstacionamientoDetalle() {
   const [loading, setLoading]   = useState(true);
   const [uploading, setUploading] = useState(false);
   const [lightbox, setLightbox] = useState(null);
+  const [resumenIA, setResumenIA] = useState(null); // { resumen, pros, contras } generado por IA
 
   const esOwner = parking && userId && parking.user_id === userId;
 
@@ -56,6 +57,17 @@ export default function EstacionamientoDetalle() {
       }
     } catch {
       // Sin reseñas: no es crítico, la ficha sigue visible.
+    }
+
+    // 3) Resumen inteligente de reseñas (IA) — independiente y best-effort.
+    //    Si no hay suficientes reseñas o la IA no está disponible, devuelve null
+    //    y simplemente no se muestra la tarjeta.
+    try {
+      const res = await fetch(`/api/resenas/resumen?estacionamiento_id=${id}`);
+      const data = await res.json();
+      if (data.success && data.resumen) setResumenIA(data);
+    } catch {
+      // Sin resumen IA: no es crítico.
     }
   };
 
@@ -198,6 +210,35 @@ export default function EstacionamientoDetalle() {
           {/* RESEÑAS */}
           <section className="det-card">
             <h3><i className="fa-solid fa-comments"></i> Reseñas {resumen.total > 0 && <span className="det-count">{resumen.total}</span>}</h3>
+
+            {/* Resumen inteligente generado por IA a partir de las reseñas verificadas */}
+            {resumenIA?.resumen && (
+              <div className="det-ai-summary">
+                <div className="det-ai-head">
+                  <i className="fa-solid fa-wand-magic-sparkles"></i>
+                  <strong>Resumen inteligente</strong>
+                  <span className="det-ai-tag">IA · {resumenIA.total} reseñas</span>
+                </div>
+                <p className="det-ai-text">{resumenIA.resumen}</p>
+                {(resumenIA.pros?.length > 0 || resumenIA.contras?.length > 0) && (
+                  <div className="det-ai-pc">
+                    {resumenIA.pros?.length > 0 && (
+                      <div className="det-ai-col">
+                        <span className="det-ai-col-h pro"><i className="fa-solid fa-thumbs-up"></i> A favor</span>
+                        {resumenIA.pros.map((p, i) => <span key={i} className="det-ai-chip pro">{p}</span>)}
+                      </div>
+                    )}
+                    {resumenIA.contras?.length > 0 && (
+                      <div className="det-ai-col">
+                        <span className="det-ai-col-h con"><i className="fa-solid fa-triangle-exclamation"></i> A considerar</span>
+                        {resumenIA.contras.map((c, i) => <span key={i} className="det-ai-chip con">{c}</span>)}
+                      </div>
+                    )}
+                  </div>
+                )}
+                <span className="det-ai-foot">Generado por IA a partir de reseñas verificadas. Puede contener imprecisiones.</span>
+              </div>
+            )}
 
             {resumen.total > 0 && (
               <div className="det-rating-summary">
@@ -370,6 +411,23 @@ export default function EstacionamientoDetalle() {
         .det-rev-meta span { font-size: 0.74rem; color: #64748b; }
         .det-rev-verified { display: inline-flex; align-items: center; gap: 5px; color: #34d399 !important; font-weight: 600; }
         .det-rev-verified i { color: #34d399; font-size: 0.78rem; }
+
+        /* Resumen inteligente (IA) */
+        .det-ai-summary { background: linear-gradient(135deg, rgba(168,85,247,0.10), rgba(59,130,246,0.08)); border: 1px solid rgba(168,85,247,0.22); border-radius: 14px; padding: 14px 16px; margin-bottom: 18px; }
+        .det-ai-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        .det-ai-head i { color: #c084fc; }
+        .det-ai-head strong { color: #f8fafc; font-size: 0.95rem; }
+        .det-ai-tag { margin-left: auto; font-size: 0.68rem; font-weight: 700; color: #c084fc; background: rgba(168,85,247,0.15); padding: 3px 9px; border-radius: 99px; }
+        .det-ai-text { color: #cbd5e1; line-height: 1.6; font-size: 0.88rem; margin: 0 0 10px; }
+        .det-ai-pc { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 8px; }
+        .det-ai-col { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 140px; }
+        .det-ai-col-h { font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; display: inline-flex; align-items: center; gap: 5px; }
+        .det-ai-col-h.pro { color: #34d399; }
+        .det-ai-col-h.con { color: #fbbf24; }
+        .det-ai-chip { font-size: 0.8rem; color: #e2e8f0; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; padding: 4px 9px; }
+        .det-ai-chip.pro { border-left: 2px solid #34d399; }
+        .det-ai-chip.con { border-left: 2px solid #fbbf24; }
+        .det-ai-foot { font-size: 0.68rem; color: #64748b; }
         .det-rev-text { color: #cbd5e1; line-height: 1.6; font-size: 0.88rem; margin: 0 0 10px; }
         .det-rev-photo { max-width: 220px; width: 100%; border-radius: 12px; cursor: pointer; border: 1px solid rgba(255,255,255,0.08); }
 
