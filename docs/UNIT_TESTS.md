@@ -40,6 +40,23 @@ cd apps/web && npm test
 > medición de cobertura. `npm test` (en `apps/web`) corre 6 pruebas de **contrato de
 > las rutas API** con el runner nativo `node:test` (sin base de datos real).
 
+> ⚠️ **¿Te aparece esta advertencia al correr `npx jest`? Es normal, no es un error:**
+> ```
+> console.warn
+>   [supabase-db] ADVERTENCIA: Faltan llaves de Supabase (URL o ANON KEY).
+>     at Object.warn (packages/supabase-db/index.js:7:11)
+> ```
+> `packages/supabase-db/index.js` tiene una **guarda defensiva**: si al inicializar
+> el cliente de Supabase no encuentra `SUPABASE_URL` / `ANON_KEY` en el entorno,
+> imprime ese aviso por consola — pero **no lanza ninguna excepción**, solo informa.
+> En un entorno de **test/sandbox local** (sin un `.env` con credenciales reales) es
+> **esperado y deseable** que esas variables no estén: las pruebas unitarias usan
+> **mocks** (`jest.mock`) y no deben depender de credenciales ni de servicios externos
+> reales. Jest simplemente captura y muestra ese `console.warn` como parte del log del
+> test — la suite de todas formas queda en **`PASS`** y el resultado final sigue siendo
+> **`Tests: 66 passed, 66 total`**. Es una señal de que el código es defensivo
+> (no truena si faltan credenciales), no algo que haya que "arreglar".
+
 ---
 
 ## 2. Qué se está probando (66 pruebas, 5 suites)
